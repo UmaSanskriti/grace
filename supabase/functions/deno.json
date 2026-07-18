@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4",
+    "std/": "https://deno.land/std@0.224.0/"
+  },
+  "lint": { "rules": { "tags": ["recommended"] } },
+  "fmt": { "lineWidth": 100, "semiColons": true, "singleQuote": false },
+  "tasks": {
+    "check": "deno check _shared/**/*.ts */index.ts",
+    "test": "deno test --allow-env --allow-net --allow-read _shared/ ../../tests/"
+  }
+}

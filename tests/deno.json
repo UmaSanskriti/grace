@@ -1,0 +1,10 @@
+{
+  "//": "Lets `deno test tests/` run from the repo root with the std alias resolved.",
+  "imports": {
+    "std/": "https://deno.land/std@0.224.0/"
+  },
+  "fmt": { "lineWidth": 100, "semiColons": true, "singleQuote": false },
+  "tasks": {
+    "test": "deno test contract/ --allow-read --allow-env"
+  }
+}

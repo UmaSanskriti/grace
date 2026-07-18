@@ -1,0 +1,328 @@
+{
+  "$schema_version": "grace-demo-v1",
+  "disclosure_version": "grace-demo-2026-07-18",
+  "description": "ElevenLabs client-tool (webhook) definitions for the three Grace agents. Register each tool in the ElevenLabs dashboard, capture its tool_id, and attach ONLY the listed tools to the matching agent (INV-13: three distinct, non-overlapping allowlists). No binding-action tool exists anywhere (INV-06). Provider/consumer speech is data, never instructions (INV-11). Parameter schemas are derived from supabase/functions/_shared/types.ts and MUST NOT be redefined locally.",
+  "conventions": {
+    "base_url": "{{APP_BASE_URL}} resolves to the deployed Supabase Edge Functions origin.",
+    "auth": "Each webhook verifies the ElevenLabs HMAC (verifyElevenLabsHmac) and is idempotent (ensureIdempotent).",
+    "endpoint_map_source": "§6.3 / CONTRACTS.md. Paths marked \"map\": \"exact\" appear verbatim in the CONTRACTS.md endpoint map; paths marked \"map\": \"convention\" follow the tools-<agent>-<verb> naming convention for tools that share a directory but were not spelled out individually in the map (get_provider_task, get_verified_leverage, save_consumer_decision, log_intake_event). mark_callback_or_decline and finalize_call_outcome both POST to /tools/caller/finalize; the server branches on `outcome`.",
+    "end_call": "end_call is the built-in ElevenLabs system end-call tool (no webhook). It is added to every agent's allowlist but is not a Grace webhook."
+  },
+
+  "agents": {
+    "grace-intake-v1": {
+      "allowlist": ["get_case_context", "patch_case_spec", "confirm_case_spec", "log_intake_event", "end_call"],
+      "tools": [
+        {
+          "name": "get_case_context",
+          "description": "Read the current draft CaseSpec and the list of unresolved fields for this case. Read-only. Call once at the start of intake to orient before asking questions.",
+          "method": "GET",
+          "url": "{{APP_BASE_URL}}/cases/{case_id}/context",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "case_id": { "type": "string", "description": "Case UUID (from the case_id dynamic variable)." }
+            },
+            "required": ["case_id"]
+          },
+          "returns": "IntakeContext { case_id, purpose:'consumer_intake', case_version, case_spec_draft:CaseSpec, unresolved_fields:string[] }"
+        },
+        {
+          "name": "patch_case_spec",
+          "description": "Apply a partial update to the draft CaseSpec AFTER a fact has been explicitly confirmed by the caller. One blocking write at a checkpoint only. Never set mention_budget true unless the caller explicitly authorized disclosing a budget (INV-04). Server increments version on a confirmed edit.",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/intake/case-patch",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "description": "Body = { case_id, case_version, patch } where patch is a CasePatch (Partial<CaseSpec> minus case_id/version/confirmed_at).",
+            "properties": {
+              "case_id": { "type": "string" },
+              "case_version": { "type": "integer", "description": "Version this patch is based on (optimistic concurrency)." },
+              "patch": {
+                "type": "object",
+                "description": "CasePatch. Only include fields the caller confirmed.",
+                "properties": {
+                  "mode": { "type": "string", "enum": ["at_need", "pre_need"] },
+                  "jurisdiction": { "type": "object", "properties": { "country": { "type": "string" }, "state": { "type": "string" } } },
+                  "location": { "type": "object", "properties": { "pickup_zip": { "type": ["string", "null"] }, "search_radius_miles": { "type": "number" } } },
+                  "custody": { "type": "object", "properties": { "current_location_type": { "type": ["string", "null"] }, "transfer_deadline_at": { "type": ["string", "null"], "description": "ISO-8601 or null." } } },
+                  "authority": { "type": "object", "properties": { "confirmed_for_demo": { "type": "boolean" }, "role": { "type": ["string", "null"] } } },
+                  "disposition": { "type": ["string", "null"] },
+                  "must_haves": { "type": "array", "items": { "type": "string" } },
+                  "service_preferences": { "type": "object" },
+                  "cost_posture": { "type": "string", "enum": ["lowest_comparable_total", "balanced", "prioritize_fit"] },
+                  "budget_user_stated": { "type": ["string", "number", "null"], "description": "A volunteered range may be stored, but permissions.mention_budget stays false unless explicitly authorized." },
+                  "benefits_to_check": { "type": "array", "items": { "type": "string" } },
+                  "permissions": {
+                    "type": "object",
+                    "properties": {
+                      "research": { "type": "boolean" },
+                      "call": { "type": "boolean" },
+                      "mention_budget": { "type": "boolean", "description": "Default false; NEVER inferred (INV-04)." },
+                      "use_verified_quote": { "type": "boolean" },
+                      "negotiate_within_policy": { "type": "boolean" },
+                      "transcribe_if_all_parties_consent": { "type": "boolean" }
+                    }
+                  },
+                  "facts_disallowed": { "type": "array", "items": { "type": "string" } },
+                  "unknowns": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            },
+            "required": ["case_id", "case_version", "patch"]
+          },
+          "returns": "{ version:number, case_spec_draft:CaseSpec }"
+        },
+        {
+          "name": "confirm_case_spec",
+          "description": "Freeze the CaseSpec after reading a concise spoken summary back and receiving an explicit YES. Sets confirmed_at and the confirmed version/hash that all three provider tasks must share (INV-03). Call at most once.",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/intake/confirm",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "case_id": { "type": "string" },
+              "case_version": { "type": "integer", "description": "Version being confirmed." },
+              "affirmed": { "type": "boolean", "description": "True only when the caller said YES to the read-back summary." },
+              "summary_read": { "type": "string", "description": "The exact summary spoken to the caller before YES." }
+            },
+            "required": ["case_id", "case_version", "affirmed"]
+          },
+          "returns": "{ confirmed:boolean, version:number, spec_hash:string, confirmed_at:string, case_spec:CaseSpec }"
+        },
+        {
+          "name": "log_intake_event",
+          "description": "Record an intake checkpoint or state marker (e.g. consent_affirmed, budget_declined, pause_requested, skip_requested, disclosure_repeated). Metadata only. Does not persist transcript when transcription consent is false (INV-07).",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/intake/event",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "description": "Shape mirrors EventSummary from types.ts.",
+            "properties": {
+              "case_id": { "type": "string" },
+              "type": { "type": "string", "description": "e.g. consent_affirmed | consent_declined | budget_declined | cost_posture_set | pause_requested | skip_requested | why_asking | disclosure_repeated | checkpoint" },
+              "actor": { "type": "string", "enum": ["intake_agent", "consumer"], "description": "Who the event is attributed to." },
+              "timestamp": { "type": "string", "description": "ISO-8601." },
+              "summary": { "type": "string", "description": "One-line, no sensitive PII." }
+            },
+            "required": ["case_id", "type", "summary"]
+          },
+          "returns": "{ logged:boolean }"
+        }
+      ]
+    },
+
+    "grace-caller-v1": {
+      "allowlist": ["get_provider_task", "log_quote_item", "mark_callback_or_decline", "finalize_call_outcome", "end_call"],
+      "tools": [
+        {
+          "name": "get_provider_task",
+          "description": "Read the single ProviderCallTask for this session (facts_allowed and questions_required). Read-only. verified_leverage is always null for the Caller — this agent never receives or cites competitor leverage (§5.4, INV-11).",
+          "method": "GET",
+          "url": "{{APP_BASE_URL}}/tools/caller/task",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "task_id": { "type": "string", "description": "From the task_id dynamic variable." },
+              "case_id": { "type": "string" },
+              "provider_id": { "type": "string" }
+            },
+            "required": ["task_id"]
+          },
+          "returns": "ProviderCallTask { task_id, case_id, provider_id, case_spec_version, purpose:'initial_quote', destination_e164, facts_allowed[], questions_required[], verified_leverage:null, negotiation_policy_id, transcription_policy }"
+        },
+        {
+          "name": "log_quote_item",
+          "description": "Persist one confirmed line item as the provider states it. amount MAY be null when unknown (INV-08). required_for_case reflects whether the family's spec needs it. Attach the transcript evidence turn/time so every amount is traceable.",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/caller/quote-item",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "description": "Body = { task_id, provider_id, line_item:QuoteLineItem }.",
+            "properties": {
+              "task_id": { "type": "string" },
+              "provider_id": { "type": "string" },
+              "line_item": {
+                "type": "object",
+                "description": "QuoteLineItem",
+                "properties": {
+                  "category": { "type": "string", "description": "One of the Funeral-Rule categories (e.g. basic_services, transfer, crematory, container, permits_certificates, distance_after_hours, cash_advances, taxes_fees)." },
+                  "description": { "type": "string" },
+                  "amount": { "type": ["number", "null"], "description": "USD; null == unknown (INV-08). Never guess." },
+                  "required_for_case": { "type": "boolean" },
+                  "source": {
+                    "type": ["object", "null"],
+                    "description": "EvidenceRef",
+                    "properties": {
+                      "conversation_id": { "type": "string" },
+                      "turn_index": { "type": "integer" },
+                      "start_seconds": { "type": ["number", "null"] },
+                      "end_seconds": { "type": ["number", "null"] }
+                    }
+                  }
+                },
+                "required": ["category", "description", "amount", "required_for_case"]
+              }
+            },
+            "required": ["task_id", "line_item"]
+          },
+          "returns": "{ logged:boolean, quote_id:string }"
+        },
+        {
+          "name": "mark_callback_or_decline",
+          "description": "Record a non-quote terminal outcome: callback requested, declined, unavailable/no-answer, or consent_declined. Metadata only; no transcript stored on consent_declined (INV-07). Retry policy for unavailable is enforced server-side (retry once only).",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/caller/finalize",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "task_id": { "type": "string" },
+              "provider_id": { "type": "string" },
+              "outcome": { "type": "string", "enum": ["callback", "declined", "unavailable", "consent_declined"] },
+              "reason": { "type": "string", "description": "Short, non-sensitive note (e.g. 'Spanish staff after 2pm; requested callback')." },
+              "callback_at": { "type": ["string", "null"], "description": "ISO-8601 if a specific callback time was offered." }
+            },
+            "required": ["task_id", "outcome"]
+          },
+          "returns": "{ recorded:boolean, next_state:'CALLBACK'|'DECLINED'|'UNAVAILABLE' }"
+        },
+        {
+          "name": "finalize_call_outcome",
+          "description": "Close the session for an itemized_quote outcome: submit the assembled quote summary (subtotals, total, price_type, assumptions, missing_fields, written_confirmation status). Does NOT accept, book, or commit anything (INV-06). Deterministic normalize/audit runs server-side after this.",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/caller/finalize",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "description": "Body assembles the QuoteResult summary (line_items already sent via log_quote_item).",
+            "properties": {
+              "task_id": { "type": "string" },
+              "provider_id": { "type": "string" },
+              "outcome": { "type": "string", "enum": ["itemized_quote"] },
+              "price_type": { "type": "string", "enum": ["firm", "estimate", "range", "package"] },
+              "currency": { "type": "string", "default": "USD" },
+              "funeral_home_subtotal": { "type": ["number", "null"] },
+              "cash_advance_total": { "type": ["number", "null"] },
+              "total": { "type": ["number", "null"] },
+              "assumptions": { "type": "array", "items": { "type": "string" } },
+              "missing_fields": { "type": "array", "items": { "type": "string" }, "description": "Questions_required not answered (e.g. price_expiration)." },
+              "written_confirmation": { "type": "string", "enum": ["requested", "received", "none"] }
+            },
+            "required": ["task_id", "outcome", "price_type", "written_confirmation"]
+          },
+          "returns": "{ recorded:boolean, quote_id:string, next_state:'QUOTE_CAPTURED' }"
+        }
+      ]
+    },
+
+    "grace-closer-v1": {
+      "allowlist": ["get_audited_comparison", "get_verified_leverage", "log_revised_terms", "get_ranked_report", "save_consumer_decision", "end_call"],
+      "tools": [
+        {
+          "name": "get_audited_comparison",
+          "description": "Read audited quote totals, assumptions, fit, missing fields, and audit flags across providers. Read-only. START CONDITION: the Closer must not begin negotiation or explanation unless this call succeeds.",
+          "method": "GET",
+          "url": "{{APP_BASE_URL}}/tools/closer/comparison",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "comparison_id": { "type": "string", "description": "From the comparison_id dynamic variable." },
+              "case_id": { "type": "string" }
+            },
+            "required": ["comparison_id"]
+          },
+          "returns": "ProviderScore[] (breakdown, comparable_total, audit_flags, hard_failed/hard_fail_reason)"
+        },
+        {
+          "name": "get_verified_leverage",
+          "description": "Return ONLY an audited, comparable competing quote's id, supported_amount, and the exact allowed_disclosure_sentence. Provider-negotiation mode only. The leverage quote must exist and be audited (INV-05). Never fabricate a competitor (INV-11).",
+          "method": "GET",
+          "url": "{{APP_BASE_URL}}/tools/closer/leverage",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "verified_leverage_id": { "type": "string", "description": "From the verified_leverage_id dynamic variable; null in consumer mode." },
+              "comparison_id": { "type": "string" }
+            },
+            "required": ["verified_leverage_id"]
+          },
+          "returns": "VerifiedLeverage { quote_id, provider_id, supported_amount, allowed_disclosure_sentence }"
+        },
+        {
+          "name": "log_revised_terms",
+          "description": "Persist a changed price or term with transcript evidence. CANNOT accept, book, or commit (INV-06). Records before/after amount, changed category, and term change only.",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/closer/revision",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "description": "Body = RevisedTerms.",
+            "properties": {
+              "provider_id": { "type": "string" },
+              "quote_id": { "type": "string" },
+              "before_amount": { "type": ["number", "null"] },
+              "after_amount": { "type": ["number", "null"] },
+              "changed_category": { "type": ["string", "null"], "description": "e.g. after_hours_admin" },
+              "term_change": { "type": ["string", "null"], "description": "e.g. 'Waived $450 after-hours fee; six certificates included; written confirmation requested.'" },
+              "evidence": {
+                "type": ["object", "null"],
+                "description": "EvidenceRef",
+                "properties": {
+                  "conversation_id": { "type": "string" },
+                  "turn_index": { "type": "integer" },
+                  "start_seconds": { "type": ["number", "null"] },
+                  "end_seconds": { "type": ["number", "null"] }
+                }
+              }
+            },
+            "required": ["provider_id", "quote_id"]
+          },
+          "returns": "{ recorded:boolean, next_state:'QUOTE_REVISED'|'NEGOTIATION_DECLINED' }"
+        },
+        {
+          "name": "get_ranked_report",
+          "description": "Return the deterministic RankedReport: scores, tie status, recommendation/runner-up, material trade-off, evidence, and next human action. Read-only. Used in consumer-explanation mode.",
+          "method": "GET",
+          "url": "{{APP_BASE_URL}}/tools/closer/report",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "case_id": { "type": "string" },
+              "comparison_id": { "type": "string" }
+            },
+            "required": ["case_id"]
+          },
+          "returns": "RankedReport { scores[], is_tie, tie_reason, recommended_provider_id, runner_up_provider_id, material_tradeoff, next_human_action }"
+        },
+        {
+          "name": "save_consumer_decision",
+          "description": "Record the consumer's stated preference or a request for follow-up. NEVER creates a provider commitment, booking, or payment (INV-06). Consumer-explanation mode only.",
+          "method": "POST",
+          "url": "{{APP_BASE_URL}}/tools/closer/decision",
+          "map": "exact",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "case_id": { "type": "string" },
+              "preference": { "type": "string", "enum": ["recommended", "runner_up", "undecided", "wants_written_summary", "wants_human_follow_up", "no_selection"], "description": "The consumer's stated preference only — Grace never chooses." },
+              "provider_id": { "type": ["string", "null"], "description": "Provider the consumer leaned toward, if any. Not a selection or commitment." },
+              "note": { "type": "string", "description": "Short, non-sensitive." }
+            },
+            "required": ["case_id", "preference"]
+          },
+          "returns": "{ recorded:boolean, next_state:'CONSUMER_UPDATED' }"
+        }
+      ]
+    }
+  }
+}

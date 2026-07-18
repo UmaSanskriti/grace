@@ -1,0 +1,160 @@
+{
+  "$schema_version": "grace-demo-v1",
+  "note": "SYNTHETIC golden fixtures for offline normalize/audit/rank (spec §11.2). All names, numbers, prices, timing are synthetic. Prices trace to config/personas.json. Transcripts are abbreviated but carry the turns the auditor/normalizer must key on. Not legal advice.",
+
+  "case_spec": {
+    "case_id": "case_golden_0001",
+    "version": 4,
+    "mode": "at_need",
+    "jurisdiction": { "country": "US", "state": "CA" },
+    "location": { "pickup_zip": "94304", "search_radius_miles": 25 },
+    "custody": { "current_location_type": "hospital", "transfer_deadline_at": null },
+    "authority": { "confirmed_for_demo": true, "role": "adult_child" },
+    "disposition": "cremation_with_service",
+    "must_haves": ["private family goodbye", "Spanish-language support"],
+    "service_preferences": { "viewing": "private", "ceremony": "memorial_later", "return_of_ashes": true },
+    "cost_posture": "balanced",
+    "budget_user_stated": null,
+    "benefits_to_check": [],
+    "permissions": {
+      "research": true,
+      "call": true,
+      "mention_budget": false,
+      "use_verified_quote": true,
+      "negotiate_within_policy": true,
+      "transcribe_if_all_parties_consent": true
+    },
+    "facts_disallowed": ["cause_of_death", "social_security_number", "payment_data"],
+    "unknowns": [],
+    "confirmed_at": "2026-07-18T17:00:00Z"
+  },
+
+  "case_spec_hash": "sha256:GOLDEN_FROZEN_V4_HASH_PLACEHOLDER",
+
+  "scenarios": {
+    "hidden_fee_persona_c": {
+      "description": "Persona C (demo_hidden_fee): $1,795 'direct cremation' headline omits transfer, private goodbye, and after-hours until asked directly. Auditor must flag the missing categories; total resolves to $4,440 after clarification. Drives normalize + audit offline.",
+      "provider_id": "demo_hidden_fee",
+      "conversation_id": "conv_c_initial",
+      "transcript": [
+        { "turn_index": 0, "speaker": "grace", "text": "Hello, I'm Grace, an AI assistant calling on behalf of a family to request and compare funeral pricing. This is a controlled hackathon demo using synthetic case details. The call will be transcribed for the demo. Do you consent to continue and be transcribed?", "start_seconds": 0.0, "end_seconds": 12.0 },
+        { "turn_index": 1, "speaker": "provider", "text": "Yes, that's fine, go ahead.", "start_seconds": 12.0, "end_seconds": 14.5 },
+        { "turn_index": 2, "speaker": "grace", "text": "Thank you. We need a cremation with a private family goodbye, hospital pickup near 94304. What is your price?", "start_seconds": 14.5, "end_seconds": 22.0 },
+        { "turn_index": 3, "speaker": "provider", "text": "Our direct cremation is just $1,795. Best price in the area.", "start_seconds": 22.0, "end_seconds": 27.0 },
+        { "turn_index": 4, "speaker": "grace", "text": "Does that $1,795 include transfer of remains from the hospital?", "start_seconds": 27.0, "end_seconds": 31.0 },
+        { "turn_index": 5, "speaker": "provider", "text": "No, hospital transfer is $695 extra.", "start_seconds": 31.0, "end_seconds": 34.5 },
+        { "turn_index": 6, "speaker": "grace", "text": "And the private family goodbye before cremation — what does that cost?", "start_seconds": 34.5, "end_seconds": 39.0 },
+        { "turn_index": 7, "speaker": "provider", "text": "The private goodbye viewing is $600.", "start_seconds": 39.0, "end_seconds": 42.0 },
+        { "turn_index": 8, "speaker": "grace", "text": "Are there after-hours or administrative fees for an immediate hospital pickup?", "start_seconds": 42.0, "end_seconds": 47.0 },
+        { "turn_index": 9, "speaker": "provider", "text": "Yes, after-hours admin is $675, and there's care and refrigeration at $350.", "start_seconds": 47.0, "end_seconds": 53.0 },
+        { "turn_index": 10, "speaker": "grace", "text": "What about the crematory charge, an alternative container, and permits plus six death certificates?", "start_seconds": 53.0, "end_seconds": 60.0 },
+        { "turn_index": 11, "speaker": "provider", "text": "Crematory is $500, alternative container $250, and permits and certificates $220. Basic services fee is $1,150.", "start_seconds": 60.0, "end_seconds": 70.0 },
+        { "turn_index": 12, "speaker": "grace", "text": "So the complete total for everything the family needs?", "start_seconds": 70.0, "end_seconds": 74.0 },
+        { "turn_index": 13, "speaker": "provider", "text": "All in, it comes to $4,440. I can send written confirmation.", "start_seconds": 74.0, "end_seconds": 79.0 }
+      ],
+      "headline_amount_first_quoted": 1795,
+      "expected_normalized_quote": {
+        "quote_id": "q_c_golden",
+        "provider_id": "demo_hidden_fee",
+        "case_spec_version": 4,
+        "outcome": "itemized_quote",
+        "price_type": "estimate",
+        "currency": "USD",
+        "line_items": [
+          { "category": "basic_services", "description": "basic services / overhead", "amount": 1150, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 11, "start_seconds": 60.0, "end_seconds": 70.0 } },
+          { "category": "hospital_transfer", "description": "hospital transfer within 25 miles", "amount": 695, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 5, "start_seconds": 31.0, "end_seconds": 34.5 } },
+          { "category": "care_refrigeration", "description": "care and refrigeration", "amount": 350, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 9, "start_seconds": 47.0, "end_seconds": 53.0 } },
+          { "category": "private_goodbye", "description": "private family goodbye viewing", "amount": 600, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 7, "start_seconds": 39.0, "end_seconds": 42.0 } },
+          { "category": "crematory", "description": "crematory charge", "amount": 500, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 11, "start_seconds": 60.0, "end_seconds": 70.0 } },
+          { "category": "alternative_container", "description": "alternative container", "amount": 250, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 11, "start_seconds": 60.0, "end_seconds": 70.0 } },
+          { "category": "permits_certificates", "description": "permits and six certificates", "amount": 220, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 11, "start_seconds": 60.0, "end_seconds": 70.0 } },
+          { "category": "after_hours_admin", "description": "after-hours administrative fee", "amount": 675, "required_for_case": true, "source": { "conversation_id": "conv_c_initial", "turn_index": 9, "start_seconds": 47.0, "end_seconds": 53.0 } }
+        ],
+        "funeral_home_subtotal": 4220,
+        "cash_advance_total": 220,
+        "total": 4440,
+        "assumptions": ["immediate hospital pickup triggers after-hours fee"],
+        "missing_fields": ["price_expiration"],
+        "written_confirmation": "requested",
+        "audit_flags": [],
+        "confidence": 0.9
+      },
+      "expected_audit_flags_on_headline": [
+        { "code": "missing_transfer_fee", "severity": "warn", "message": "Headline $1,795 omitted hospital transfer ($695)." },
+        { "code": "missing_after_hours_fee", "severity": "warn", "message": "Headline $1,795 omitted after-hours admin ($675)." }
+      ],
+      "expected_outcome_note": "Headline $1,795 -> resolved $4,440 after direct category questions. Subtotal 4220 + cash advances 220 == total 4440 (arithmetic passes, no line_items_do_not_sum_to_total flag)."
+    },
+
+    "verified_leverage_waiver": {
+      "description": "Persona A (demo_transparent) supplies the audited comparable quote used as leverage. Grace Closer cites it; Persona C then waives the $450 after-hours fee, taking C's total from $4,440 to $3,990. Persona C must request written confirmation post-waiver. Drives audit + rank offline.",
+      "leverage_source_quote": {
+        "quote_id": "q_a_golden",
+        "provider_id": "demo_transparent",
+        "case_spec_version": 4,
+        "outcome": "itemized_quote",
+        "price_type": "firm",
+        "currency": "USD",
+        "line_items": [
+          { "category": "basic_services", "description": "basic services / overhead", "amount": 1700, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 8, "start_seconds": 40.0, "end_seconds": 48.0 } },
+          { "category": "hospital_transfer", "description": "hospital transfer within 25 miles", "amount": 495, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 10, "start_seconds": 55.0, "end_seconds": 62.0 } },
+          { "category": "care_refrigeration", "description": "care and refrigeration", "amount": 250, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 12, "start_seconds": 66.0, "end_seconds": 70.0 } },
+          { "category": "private_goodbye", "description": "private family goodbye", "amount": 450, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 14, "start_seconds": 74.0, "end_seconds": 80.0 } },
+          { "category": "crematory", "description": "crematory charge", "amount": 425, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 16, "start_seconds": 84.0, "end_seconds": 90.0 } },
+          { "category": "alternative_container", "description": "alternative container", "amount": 150, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 16, "start_seconds": 84.0, "end_seconds": 90.0 } },
+          { "category": "after_hours_admin", "description": "no after-hours fee", "amount": 0, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 16, "start_seconds": 84.0, "end_seconds": 90.0 } },
+          { "category": "certificates", "description": "six certified copies added to service subtotal (resolved)", "amount": 280, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 18, "start_seconds": 96.0, "end_seconds": 104.0 } },
+          { "category": "permits_certificates", "description": "permits (cash advance / third-party)", "amount": 190, "required_for_case": true, "source": { "conversation_id": "conv_a_initial", "turn_index": 18, "start_seconds": 96.0, "end_seconds": 104.0 } }
+        ],
+        "funeral_home_subtotal": 3750,
+        "cash_advance_total": 190,
+        "total": 3940,
+        "assumptions": ["pickup within 25 miles"],
+        "missing_fields": [],
+        "written_confirmation": "requested",
+        "audit_flags": [],
+        "confidence": 0.93,
+        "audit_status": "AUDITED"
+      },
+      "verified_leverage": {
+        "quote_id": "q_a_golden",
+        "provider_id": "demo_transparent",
+        "supported_amount": 3940,
+        "allowed_disclosure_sentence": "A comparable provider gave a complete written itemized total of $3,940 with no after-hours fee."
+      },
+      "negotiation_conversation_id": "conv_c_negotiation",
+      "negotiation_transcript": [
+        { "turn_index": 0, "speaker": "grace", "text": "Hello, I'm Grace, following up on your funeral pricing quote for this synthetic demo. The call is transcribed. Do you consent to continue?", "start_seconds": 0.0, "end_seconds": 8.0 },
+        { "turn_index": 1, "speaker": "provider", "text": "Yes.", "start_seconds": 8.0, "end_seconds": 9.0 },
+        { "turn_index": 2, "speaker": "grace", "text": "A comparable provider gave a complete written itemized total of $3,940 with no after-hours fee. Can you match on the after-hours charge?", "start_seconds": 9.0, "end_seconds": 18.0 },
+        { "turn_index": 3, "speaker": "provider", "text": "Given a verified comparable quote, I can waive the $450 after-hours fee. New total is $3,990. I'll send written confirmation.", "start_seconds": 18.0, "end_seconds": 27.0 }
+      ],
+      "expected_revised_terms": {
+        "provider_id": "demo_hidden_fee",
+        "quote_id": "q_c_golden",
+        "before_amount": 4440,
+        "after_amount": 3990,
+        "changed_category": "after_hours_admin",
+        "term_change": "waived_after_hours_fee",
+        "evidence": { "conversation_id": "conv_c_negotiation", "turn_index": 3, "start_seconds": 18.0, "end_seconds": 27.0 }
+      },
+      "expected_revised_written_confirmation": "requested",
+      "waiver_delta": -450,
+      "note": "Waiver ($450) is applied to the after_hours_admin line (675 -> 225), taking total 4440 -> 3990. The $450 delta only unlocks AFTER Grace cites the audited Persona A quote (requires_verified_leverage). Persona C then requests written confirmation (post_condition)."
+    }
+  },
+
+  "expected_ranking_inputs": {
+    "note": "Feed these three ProviderScore-shaped inputs to rankProviders with config/vertical.json weights. demo_hidden_fee uses the POST-waiver total (3990). This exercises the tie/recommend logic (recommend only if topScore - secondScore > 3; totals within 5% with different fit advantages = tie).",
+    "comparable_totals": {
+      "demo_transparent": 3940,
+      "demo_package_first": 4250,
+      "demo_hidden_fee": 3990
+    },
+    "hard_fails": {
+      "demo_transparent": false,
+      "demo_package_first": false,
+      "demo_hidden_fee": false
+    }
+  }
+}

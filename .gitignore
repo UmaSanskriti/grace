@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+web/node_modules/
+.pnp
+.pnp.js
+
+# Env / secrets — NEVER commit real keys
+.env
+.env.local
+.env.*.local
+*.key
+
+# Build outputs
+web/dist/
+dist/
+build/
+*.tsbuildinfo
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+.supabase/
+
+# Generated evidence ledgers (synthetic, but transient)
+data/cases/
+
+# Logs / OS
+*.log
+npm-debug.log*
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Test artifacts
+coverage/
+.deno/
