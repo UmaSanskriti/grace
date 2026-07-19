@@ -115,7 +115,12 @@ def start_next_quote_call(case_id: str) -> dict:
     # Nothing left to call.
     storage.set_status(case_id, "quotes_collected")
     log.info("all quotes collected case=%s", case_id)
-    return {"done": True, "status": "quotes_collected"}
+    if settings.auto_advance:
+        # Continue: build strategy, then start negotiation calls.
+        from . import strategy  # lazy import to avoid a cycle
+        if strategy.run_strategy(case_id).get("ok"):
+            start_next_nego_call(case_id)
+    return {"done": True, "status": (storage.read_case(case_id) or {}).get("status")}
 
 
 def handle_quote_result(case_id: str, fh_id: str | None, conversation_id: str, transcript: str) -> None:

@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     demo_mode: bool = False
     demo_targets: str = ""  # comma-separated E.164 numbers
 
+    # Auto-cascade the pipeline (research -> quotes -> strategy -> negotiation
+    # -> report) without manual /advance. Set false to step each stage by hand
+    # for a narrated demo.
+    auto_advance: bool = True
+
     @property
     def demo_target_list(self) -> list[str]:
         return [n.strip() for n in self.demo_targets.split(",") if n.strip()]

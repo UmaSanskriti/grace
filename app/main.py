@@ -176,9 +176,13 @@ async def elevenlabs_webhook(request: Request, background: BackgroundTasks) -> d
 
 
 def _pipeline_after_intake(case_id: str) -> None:
-    """Background: research, then kick the first quote call if it succeeded."""
+    """Background: research, then kick the first quote call if it succeeded.
+
+    The quote call (and everything downstream) only auto-fires when AUTO_ADVANCE
+    is on; otherwise the case rests at calling_for_quotes for a manual /advance.
+    """
     res = research.run_research(case_id)
-    if res.get("ok"):
+    if res.get("ok") and settings.auto_advance:
         calls.start_next_quote_call(case_id)
 
 
