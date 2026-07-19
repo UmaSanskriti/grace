@@ -253,6 +253,71 @@ def test_failures_never_raise() -> None:
           "call placed with an empty report_summary")
 
 
+def test_save_json_failure_never_raises() -> None:
+    """A persistent storage failure (disk full, permissions) must not escape
+    deliver_report — not even from the outer catch-all's own attempt to
+    record the failure.
+
+    Forces a guard path (no agent id) so _record is called with
+    storage.save_json patched to always raise. Before the fix, that raise
+    propagates out of _record, is caught by deliver_report's outer except,
+    which calls _record again to log "failed" — and that save_json call
+    raises too, escaping deliver_report unhandled. After the fix, the first
+    _record call swallows the storage failure internally and still returns
+    a well-formed "skipped" record.
+    """
+    settings.elevenlabs_report_agent_id = ""
+    settings.demo_mode = False
+
+    real_save_json = storage.save_json
+    storage.save_json = lambda *a, **kw: (_ for _ in ()).throw(OSError("disk full"))
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            case_id = _seed(Path(td))
+            try:
+                r = report_call.deliver_report(case_id, "# report")
+            except Exception as e:
+                check(False, f"deliver_report raised despite persistent storage failure: {e!r}")
+                return
+    finally:
+        storage.save_json = real_save_json
+
+    check(isinstance(r, dict), f"expected a dict even when nothing could be persisted, got {r!r}")
+    check(set(r) == {"status", "call_id", "to_number", "summary_source", "notes"},
+          f"record shape drifted when storage failed: {sorted(r)}")
+    check(r["status"] == "skipped" and "REPORT_AGENT_ID" in r["notes"],
+          f"guard status/notes lost when storage kept raising: {r!r}")
+
+
+def test_index_conversation_failure_still_placed() -> None:
+    """A successfully placed call must be recorded as placed even if the
+    post-call bookkeeping (index_conversation) blows up — the family's phone
+    is already ringing by the time indexing runs, so its failure must not
+    contradict reality in the recorded status.
+    """
+    settings.elevenlabs_report_agent_id = "agent_report_1"
+    settings.demo_mode = False
+
+    rec = _Recorder()
+    report_call.outbound_call = rec
+
+    real_index_conversation = storage.index_conversation
+    storage.index_conversation = lambda *a, **kw: (_ for _ in ()).throw(
+        RuntimeError("index corrupted"))
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            case_id = _seed(Path(td))
+            r = report_call.deliver_report(case_id, "# report")
+            saved = storage.read_json(case_id, "report_call.json")
+    finally:
+        storage.index_conversation = real_index_conversation
+
+    check(r["status"] == "placed",
+          f"a placed call was recorded as {r['status']!r} because indexing failed: {r!r}")
+    check(r["call_id"] == "conv_test_1", f"call_id lost when indexing failed: {r!r}")
+    check(saved == r, f"report_call.json disagrees with the return value: {saved!r}")
+
+
 def main() -> int:
     report_call.OpenAI = _BoomOpenAI
     test_summary()
@@ -261,6 +326,8 @@ def main() -> int:
     test_happy_path()
     test_guards()
     test_failures_never_raise()
+    test_save_json_failure_never_raises()
+    test_index_conversation_failure_still_placed()
 
     if failures:
         for f in failures:

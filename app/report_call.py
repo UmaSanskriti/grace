@@ -158,7 +158,13 @@ def _record(
         "summary_source": summary_source,
         "notes": notes,
     }
-    storage.save_json(case_id, "report_call.json", rec)
+    try:
+        storage.save_json(case_id, "report_call.json", rec)
+    except Exception:
+        # Persisting the record is best-effort; returning it is not optional.
+        # This is the last-resort path (called from deliver_report's outer
+        # except), so it must be incapable of raising itself.
+        log.exception("failed to persist report_call.json case=%s", case_id)
     log.info("report call case=%s status=%s notes=%s", case_id, status, notes)
     return rec
 
@@ -192,7 +198,14 @@ def _deliver(case_id: str, md: str) -> dict:
 
     conv = resp.get("conversation_id", "")
     if conv:
-        storage.index_conversation(conv, case_id, "report")
+        try:
+            storage.index_conversation(conv, case_id, "report")
+        except Exception:
+            # The call already went out — indexing is bookkeeping, and its
+            # failure must not turn a placed call into a recorded failure.
+            log.exception(
+                "failed to index conversation case=%s conversation_id=%s", case_id, conv,
+            )
     log.info("placed report call case=%s to=%s conversation_id=%s", case_id, phone, conv)
     return _record(
         case_id, "placed", call_id=conv or None, to_number=phone, summary_source=source,
