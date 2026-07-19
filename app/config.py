@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     # --- LLM ---
     openai_api_key: str = ""
+    # Optional override for structured extraction (defaults in app/extraction.py).
+    openai_extraction_model: str = ""
 
     # --- Research APIs ---
     google_places_api_key: str = ""
