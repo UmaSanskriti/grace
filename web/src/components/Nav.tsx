@@ -11,6 +11,7 @@ export default function Nav() {
 
   const links = [
     { to: "/", label: "Consent & Enroll", end: true },
+    { to: "/agents", label: "Live Agent Loop", end: false },
     { to: `/case/${caseId}`, label: "Case Dashboard", end: false },
     { to: `/demo-provider/${personaId}`, label: "Roleplayer Console", end: false },
   ];

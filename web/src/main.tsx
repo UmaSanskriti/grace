@@ -6,6 +6,7 @@ import App from "./App";
 import Enroll from "./routes/Enroll";
 import CaseDashboard from "./routes/CaseDashboard";
 import RoleplayerConsole from "./routes/demo-provider/RoleplayerConsole";
+import AgentLoop from "./routes/AgentLoop";
 
 const router = createBrowserRouter([
   {
@@ -13,6 +14,7 @@ const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <Enroll /> },
+      { path: "agents", element: <AgentLoop /> },
       { path: "case/:caseId", element: <CaseDashboard /> },
       { path: "demo-provider/:personaId", element: <RoleplayerConsole /> },
     ],
