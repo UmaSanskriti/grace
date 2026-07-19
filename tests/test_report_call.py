@@ -322,20 +322,30 @@ def test_pipeline_reaches_done() -> None:
     """A failing report call must not strand the case before `done`."""
     from app import calls, report
 
+    real_generate_report = report.generate_report
+    real_outbound_call = report_call.outbound_call
+    real_elevenlabs_report_agent_id = settings.elevenlabs_report_agent_id
+    real_demo_mode = settings.demo_mode
+
     settings.elevenlabs_report_agent_id = "agent_report_1"
     settings.demo_mode = False
     report_call.outbound_call = _Recorder(exc=report_call.ElevenLabsError("503"))
+    report.generate_report = lambda cid: "# Grace — Funeral Quote Report\n"
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            case_id = _seed(Path(td), status="negotiating")
+            # An empty shortlist means the loop falls straight through to reporting.
+            storage._write_json(Path(td) / case_id / "strategy.json",
+                                {"shortlist": [], "per_home_strategy": []})
+            # generate_report would call OpenAI; its own fallback is tested elsewhere.
 
-    with tempfile.TemporaryDirectory() as td:
-        case_id = _seed(Path(td), status="negotiating")
-        # An empty shortlist means the loop falls straight through to reporting.
-        storage._write_json(Path(td) / case_id / "strategy.json",
-                            {"shortlist": [], "per_home_strategy": []})
-        # generate_report would call OpenAI; its own fallback is tested elsewhere.
-        report.generate_report = lambda cid: "# Grace — Funeral Quote Report\n"
-
-        result = calls.start_next_nego_call(case_id)
-        case = storage.read_case(case_id)
+            result = calls.start_next_nego_call(case_id)
+            case = storage.read_case(case_id)
+    finally:
+        report.generate_report = real_generate_report
+        report_call.outbound_call = real_outbound_call
+        settings.elevenlabs_report_agent_id = real_elevenlabs_report_agent_id
+        settings.demo_mode = real_demo_mode
 
     check(case["status"] == "done", f"case stranded at {case['status']!r} by a failed call")
     check(result.get("report_call", {}).get("status") == "failed",
