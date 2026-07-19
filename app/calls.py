@@ -187,17 +187,98 @@ def _mark_nego_unreachable(case_id: str, fh_id: str, name: str, reason: str) -> 
     log.info("nego home unreachable case=%s fh=%s: %s", case_id, fh_id, reason)
 
 
+NO_COMPETING_QUOTE = "no competing quote was captured"
+
+
+def _best_competing_quote(case_id: str, exclude_fh_id: str) -> dict | None:
+    """The lowest *evidenced* competitor quote, or None.
+
+    Built only from quote records — never from strategy.json's LLM-authored
+    `leverage`, and never from market research. If no provider actually gave us a
+    comparable number, this returns None and the agent is told so explicitly; it
+    must not fall back to an average or an estimate (INV-05 / INV-08).
+    """
+    best: dict | None = None
+    qdir = storage.case_dir(case_id) / "quotes"
+    if not qdir.exists():
+        return None
+    for path in sorted(qdir.glob("*.json")):
+        q = storage.read_json(case_id, f"quotes/{path.name}") or {}
+        if q.get("funeral_home_id") == exclude_fh_id:
+            continue  # their own price is not leverage against them
+        price = q.get("quoted_price_usd")
+        if not q.get("reached") or price is None:
+            continue
+        if best is None or price < best["quoted_price_usd"]:
+            best = q
+    return best
+
+
+def _competing_disclosure(
+    case_id: str, exclude_fh_id: str, service_type: str, current_price: object = None
+) -> str:
+    """The one sentence the agent is allowed to say about a competitor.
+
+    The amount is embedded in the sentence rather than passed as its own variable:
+    on 2026-07-19 the prompt read "(a verified quote of {{competing_quote_total}})"
+    with that variable unset, so the sentence asserted a quote existed while showing
+    a blank — and the agent filled the blank with the confidential target price.
+    One variable that is either a complete true sentence or an explicit denial
+    removes that failure mode.
+    """
+    comp = _best_competing_quote(case_id, exclude_fh_id)
+    if comp is None:
+        return NO_COMPETING_QUOTE
+    # A competitor quote is only leverage if it undercuts them. Citing a higher
+    # rival price ("can you match their $10,000?" to someone quoting $3,000) is
+    # nonsense, so treat it as having no leverage and let the agent fall back to
+    # the fee-reduction ask.
+    if isinstance(current_price, (int, float)) and comp["quoted_price_usd"] >= current_price:
+        return NO_COMPETING_QUOTE
+    amount = _money(comp["quoted_price_usd"])
+    name = comp.get("funeral_home_name") or comp.get("funeral_home_id") or "another provider"
+    return f"another provider ({name}) gave us a verified quote of {amount} for a comparable {service_type or 'service'}"
+
+
+def _prior_quote_summary(quote: dict) -> str:
+    """What this provider already told us — evidenced, so safe to restate."""
+    parts: list[str] = []
+    if quote.get("price_type"):
+        parts.append(f"quoted as a {quote['price_type'].replace('_', ' ')}")
+    if quote.get("includes"):
+        parts.append(f"includes {', '.join(quote['includes'][:2])}")
+    if quote.get("excludes"):
+        parts.append(f"excludes {', '.join(quote['excludes'])}")
+    return "; ".join(parts) or "no itemization captured"
+
+
 def _nego_dynamic_vars(case_id: str, home: dict, quote: dict, hs: dict, user_info: dict) -> dict[str, str]:
+    fh_id = home.get("id", "")
+    service_type = user_info.get("service_type") or ""
+    must_haves = user_info.get("must_haves") or []
+    flexible = user_info.get("flexible_if_savings") or []
     return {
         "case_id": case_id,
         "agent_type": "nego",
-        "fh_id": home.get("id", ""),
+        "fh_id": fh_id,
         "funeral_home_name": home.get("name") or quote.get("funeral_home_name", ""),
-        "service_type": user_info.get("service_type") or "",
+        "service_type": service_type,
         "current_price": _money(hs.get("current_price_usd") or quote.get("quoted_price_usd")),
         "target_price": _money(hs.get("target_price_usd")),
         "walk_away_price": _money(hs.get("walk_away_price_usd")),
-        "leverage": "; ".join(hs.get("leverage") or []) or "the local market average",
+        "prior_quote_summary": _prior_quote_summary(quote),
+        # A complete true sentence, or an explicit denial. Never a bare number.
+        "competing_quote_disclosure": _competing_disclosure(
+            case_id, fh_id, service_type,
+            hs.get("current_price_usd") or quote.get("quoted_price_usd"),
+        ),
+        # Intake captured these; empty is meaningful, so say so rather than blank.
+        "flexible_items": ", ".join(flexible) or "nothing — the family has not authorized any trades",
+        "must_haves": ", ".join(must_haves) or "everything discussed at intake",
+        "fallback_ask": (
+            "including the first two death certificates, or holding the quoted "
+            "price in writing for 48 hours"
+        ),
     }
 
 

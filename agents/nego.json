@@ -87,7 +87,13 @@
         "current_price": "",
         "target_price": "",
         "walk_away_price": "",
-        "leverage": ""
+        "leverage": "",
+        "prior_quote_summary": "",
+        "competing_quote_disclosure": "",
+        "competing_quote_total": "",
+        "flexible_items": "",
+        "must_haves": "",
+        "fallback_ask": ""
       }
     },
     "disable_first_message_interruptions": false,
