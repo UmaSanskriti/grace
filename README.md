@@ -73,6 +73,21 @@ cp .env.sample .env   # then fill in keys (already done if you have .env)
 Set `DEMO_TARGETS` in `.env` to a comma-separated list of E.164 numbers you're allowed to call
 (teammate phones for the demo — **never real funeral homes**).
 
+### SMS notifications (optional)
+
+To text the user pipeline-progress updates, set these Twilio credentials in `.env` (from
+[console.twilio.com](https://console.twilio.com)):
+
+| Var | What it is |
+|---|---|
+| `TWILIO_ACCOUNT_SID` | Account SID (starts with `AC…`) |
+| `TWILIO_AUTH_TOKEN` | Auth Token from the same console page |
+| `TWILIO_SMS_FROM` | an **SMS-capable** Twilio number in E.164 to send from (e.g. `+14155550123`) |
+
+These are separate from the ElevenLabs API key. The user's number is captured automatically from the
+inbound intake call (`case.user_phone`), so no number needs to be entered by hand. If all three are
+set, `settings.sms_configured` is true and SMS sending is enabled; if unset, SMS is skipped.
+
 ## Run + test the calling loop
 
 ```bash

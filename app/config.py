@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     google_places_api_key: str = ""
     tavily_api_key: str = ""
 
+    # --- Twilio (SMS progress notifications) ---
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_sms_from: str = ""  # SMS-capable Twilio number, E.164
+
+    @property
+    def sms_configured(self) -> bool:
+        return bool(self.twilio_account_sid and self.twilio_auth_token and self.twilio_sms_from)
+
     # --- Orchestrator ---
     base_url: str = ""  # ngrok URL in dev, Railway URL in prod
 
