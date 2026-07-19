@@ -171,23 +171,45 @@ async def elevenlabs_webhook(request: Request, background: BackgroundTasks) -> d
         case_id, agent_type, fh_id, len(parsed.transcript_turns), parsed.summary[:120],
     )
 
+    # Did the conversation actually complete? A failed or truncated one is a
+    # call failure, not a transcript to extract from (issue #16). The raw
+    # payload and transcript are saved above either way — they are the evidence
+    # for why we rejected it.
+    failure_reason = parsed.failure_reason
+    if failure_reason:
+        log.warning(
+            "call FAILED case=%s agent=%s fh=%s: %s "
+            "[status=%s call_successful=%s duration=%ss turns=%d]",
+            case_id, agent_type, fh_id, failure_reason,
+            parsed.status, parsed.call_successful,
+            parsed.call_duration_secs, len(parsed.transcript_turns),
+        )
+    result: dict = {
+        "ok": True, "case_id": case_id, "agent_type": agent_type, "fh_id": fh_id,
+        "call_failed": bool(failure_reason), "failure_reason": failure_reason,
+    }
+
     # Dispatch on agent type. Quote/nego extraction lands in Slice 4/5.
-    result: dict = {"ok": True, "case_id": case_id, "agent_type": agent_type, "fh_id": fh_id}
     if agent_type == "intake":
-        status = _handle_intake(case_id, parsed.transcript_text)
-        result["status"] = status
-        if status == "intake_done":
-            # Research + first quote call, off the request path (fast webhook).
-            background.add_task(_pipeline_after_intake, case_id)
+        if failure_reason:
+            result["status"] = _handle_intake_failure(case_id, failure_reason)
+        else:
+            status = _handle_intake(case_id, parsed.transcript_text)
+            result["status"] = status
+            if status == "intake_done":
+                # Research + first quote call, off the request path.
+                background.add_task(_pipeline_after_intake, case_id)
     elif agent_type == "quote":
         background.add_task(
             calls.handle_quote_result,
             case_id, fh_id, parsed.conversation_id, parsed.transcript_text,
+            failure_reason,
         )
     elif agent_type == "nego":
         background.add_task(
             calls.handle_nego_result,
             case_id, fh_id, parsed.conversation_id, parsed.transcript_text,
+            failure_reason,
         )
     elif agent_type == "report":
         # Terminal. The case was set `done` when this call was placed, and the
@@ -214,6 +236,22 @@ def _pipeline_after_intake(case_id: str) -> None:
     res = research.run_research(case_id)
     if res.get("ok") and settings.auto_advance:
         calls.start_next_quote_call(case_id)
+
+
+def _handle_intake_failure(case_id: str, reason: str) -> str:
+    """Park the case at a terminal status when the intake call itself failed.
+
+    No extraction is attempted: a conversation that failed or was cut off has no
+    reliable family details in it, and inventing a user_info.json from one would
+    steer every downstream call. Never raises — the webhook must still return
+    200 or ElevenLabs retry-storms it.
+    """
+    try:
+        storage.set_status(case_id, "intake_call_failed")
+    except Exception as e:
+        log.error("could not record intake failure case=%s: %s", case_id, e)
+    log.error("intake call failed case=%s: %s — case stopped", case_id, reason)
+    return "intake_call_failed"
 
 
 def _handle_intake(case_id: str, transcript: str) -> str:

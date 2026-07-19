@@ -158,7 +158,13 @@ def handle_quote_result(case_id: str, fh_id: str | None, conversation_id: str, t
     else:
         homes = storage.read_json(case_id, "funeral_homes.json") or []
         home = _home_by_id(homes, fh_id) or {"id": fh_id, "name": ""}
-        if not transcript.strip():
+        if failure_reason:
+            # The call was really placed, so carry the conversation id: this
+            # counts as a dial attempt even though it yielded nothing.
+            _mark_unreachable(
+                case_id, home, f"call failed: {failure_reason}", call_id=conversation_id
+            )
+        elif not transcript.strip():
             # The call was actually placed (a conversation_id exists) — just
             # nobody picked up, or the transcript came back empty. Distinct
             # from "never dialed": carry the call id so _homes_called counts
@@ -198,14 +204,22 @@ def _nego_rel(fh_id: str) -> str:
     return f"negotiations/{fh_id}.json"
 
 
-def _mark_nego_unreachable(case_id: str, fh_id: str, name: str, reason: str) -> None:
+def _mark_nego_unreachable(
+    case_id: str, fh_id: str, name: str, reason: str, call_id: str | None = None
+) -> None:
+    """Record a negotiation as not achieved.
+
+    `call_id` mirrors `_mark_unreachable`: pass the conversation id when the
+    call was actually placed (no answer, a failed/truncated conversation, or an
+    extraction failure) and leave it None when the home was never dialed.
+    """
     storage.save_json(
         case_id,
         _nego_rel(fh_id),
         {
             "funeral_home_id": fh_id,
             "funeral_home_name": name,
-            "call_id": None,
+            "call_id": call_id,
             "agreed": False,
             "final_price_usd": None,
             "status": "unreachable",
@@ -373,8 +387,19 @@ def start_next_nego_call(case_id: str) -> dict:
     return {"done": True, "status": "done", "report_call": rc}
 
 
-def handle_nego_result(case_id: str, fh_id: str | None, conversation_id: str, transcript: str) -> None:
-    """Extract + save a negotiation outcome, then place the next one (or report)."""
+def handle_nego_result(
+    case_id: str,
+    fh_id: str | None,
+    conversation_id: str,
+    transcript: str,
+    failure_reason: str | None = None,
+) -> None:
+    """Extract + save a negotiation outcome, then place the next one (or report).
+
+    `failure_reason` is set when the post-call webhook said the conversation
+    failed or was cut off; that transcript is never extracted, so a truncated
+    call can never be recorded as an agreed price (issue #16).
+    """
     if not fh_id:
         log.warning("nego webhook without fh_id case=%s — cannot record", case_id)
         return
@@ -386,13 +411,24 @@ def handle_nego_result(case_id: str, fh_id: str | None, conversation_id: str, tr
         home = _home_by_id(homes, fh_id) or {"id": fh_id, "name": ""}
         quote = storage.read_json(case_id, _quote_rel(fh_id)) or {}
         name = home.get("name") or quote.get("funeral_home_name", "")
-        if not transcript.strip():
-            _mark_nego_unreachable(case_id, fh_id, name, "empty transcript / no answer")
+        if failure_reason:
+            _mark_nego_unreachable(
+                case_id, fh_id, name, f"call failed: {failure_reason}",
+                call_id=conversation_id,
+            )
+        elif not transcript.strip():
+            _mark_nego_unreachable(
+                case_id, fh_id, name, "empty transcript / no answer",
+                call_id=conversation_id,
+            )
         else:
             try:
                 outcome = extract_final_price(transcript)
             except Exception as e:
-                _mark_nego_unreachable(case_id, fh_id, name, f"extraction failed: {e}")
+                _mark_nego_unreachable(
+                    case_id, fh_id, name, f"extraction failed: {e}",
+                    call_id=conversation_id,
+                )
             else:
                 record = {
                     "funeral_home_id": fh_id,
