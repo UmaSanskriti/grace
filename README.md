@@ -85,7 +85,8 @@ ngrok http 8000
 
 Paste the ngrok **https** URL into each ElevenLabs agent's post-call webhook config as
 `{ngrok-url}/webhooks/elevenlabs` (see the setup notes at the top of each file in `prompts/`).
-Also configure the agent system prompts / first messages / dynamic variables from `prompts/`.
+Deploy the agent prompts from git with `scripts/deploy_agents.py` (below) instead of pasting them
+by hand.
 
 ```bash
 # 3. place a test call to the first DEMO_TARGET
@@ -105,6 +106,40 @@ Answer the phone, role-play a funeral home, hang up. Then:
 curl localhost:8000/cases/<case_id>          # full case state (transcripts land here)
 cat data/<case_id>/transcripts/*.txt
 ```
+
+## Manage agents in git (`scripts/deploy_agents.py`)
+
+Agent configuration is version-controlled across two files per agent:
+
+| File | Owns |
+|---|---|
+| `prompts/{type}_agent.md` | prose — the `## First message` and `## System prompt` sections |
+| `agents/{type}.json` | the full `conversation_config` — llm, voice, temperature, asr, turn, ... (everything *except* the prompt text + first message) |
+
+The script targets the ElevenLabs agents named by the `ELEVENLABS_*_AGENT_ID` values in `.env`
+(`type` = `intake` | `quote` | `nego`).
+
+```bash
+# 1. bootstrap (or re-sync) agents/*.json from your live agents — run this first
+uv run python scripts/deploy_agents.py --pull
+
+# 2. edit agents/*.json (voice, llm, temperature, ...) and/or prompts/*.md
+
+# 3. deploy: shows a diff of what would change on the live agent, then asks to confirm
+uv run python scripts/deploy_agents.py --dry-run      # show the diff, change nothing
+uv run python scripts/deploy_agents.py                # deploy all (prompts each agent y/N)
+uv run python scripts/deploy_agents.py --agent quote  # just one agent
+uv run python scripts/deploy_agents.py --yes          # skip the confirmation prompt (CI)
+```
+
+Deploy merges the prompt back into the mirrored config and PATCHes the whole `conversation_config`,
+so git is the source of truth — a value changed in the dashboard is reverted on the next deploy
+unless you `--pull` it first. `{{dynamic_variables}}` used in the prose are auto-registered as
+placeholders (default `""`); set non-empty defaults directly in `agents/{type}.json`.
+
+Not managed by this script (still done in the dashboard): attaching phone numbers, the
+workspace-level post-call webhook URL/secret, and `platform_settings` (widget, data collection,
+evaluation criteria).
 
 ## Endpoints
 
