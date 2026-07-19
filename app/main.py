@@ -12,7 +12,7 @@ import logging
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from . import calls, research, storage
+from . import calls, research, storage, strategy
 from .config import settings
 from .elevenlabs_client import ElevenLabsError, outbound_call
 from .extraction import extract_user_info
@@ -164,6 +164,11 @@ async def elevenlabs_webhook(request: Request, background: BackgroundTasks) -> d
             calls.handle_quote_result,
             case_id, fh_id, parsed.conversation_id, parsed.transcript_text,
         )
+    elif agent_type == "nego":
+        background.add_task(
+            calls.handle_nego_result,
+            case_id, fh_id, parsed.conversation_id, parsed.transcript_text,
+        )
     else:
         log.info("no handler for agent=%s yet (transcript saved)", agent_type)
 
@@ -262,8 +267,26 @@ def advance_case(case_id: str) -> dict:
             "status": (storage.read_case(case_id) or {}).get("status"),
         }
 
+    if status == "quotes_collected":
+        result = strategy.run_strategy(case_id)
+        return {
+            "case_id": case_id,
+            "ran": "strategy",
+            "result": result,
+            "status": (storage.read_case(case_id) or {}).get("status"),
+        }
+
+    if status in ("strategy_ready", "negotiating"):
+        result = calls.start_next_nego_call(case_id)
+        return {
+            "case_id": case_id,
+            "ran": "nego_call",
+            "result": result,
+            "status": (storage.read_case(case_id) or {}).get("status"),
+        }
+
     return {
         "case_id": case_id,
         "status": status,
-        "note": f"no automated step for status {status!r} yet (Slice 5+)",
+        "note": f"no automated step for status {status!r} (pipeline complete or manual)",
     }

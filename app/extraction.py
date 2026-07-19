@@ -261,6 +261,46 @@ def extract_quote(transcript: str) -> dict:
     return data
 
 
+FINAL_PRICE_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["agreed", "final_price_usd", "walked_away", "concessions", "notes"],
+    "properties": {
+        "agreed": {"type": "boolean"},
+        "final_price_usd": _nullable("number"),
+        "walked_away": {"type": "boolean"},
+        "concessions": _str_array(),
+        "notes": {"type": "string"},
+    },
+}
+
+
+def _validate_final_price(data: dict) -> list[str]:
+    errors: list[str] = []
+    for key in FINAL_PRICE_SCHEMA["required"]:
+        if key not in data:
+            errors.append(f"missing required field: {key}")
+    price = data.get("final_price_usd")
+    if price is not None and not isinstance(price, (int, float)):
+        errors.append("final_price_usd must be a number or null")
+    return errors
+
+
 def extract_final_price(transcript: str) -> dict:
-    """Negotiation transcript -> negotiations/{fh_id}.json shape. TODO(Slice 5)."""
-    raise NotImplementedError
+    """Negotiation transcript -> the LLM portion of negotiations/{fh_id}.json (Slice 5)."""
+    system_prompt = _extraction_prompt("extract_final_price.md")
+    user_content = f"NEGOTIATION CALL TRANSCRIPT:\n{transcript}"
+
+    data = _call_structured(system_prompt, user_content, "final_price", FINAL_PRICE_SCHEMA)
+    errors = _validate_final_price(data)
+    if errors:
+        retry_content = (
+            f"{user_content}\n\nYour previous output failed validation:\n- "
+            + "\n- ".join(errors)
+            + "\nReturn corrected JSON."
+        )
+        data = _call_structured(system_prompt, retry_content, "final_price", FINAL_PRICE_SCHEMA)
+        errors = _validate_final_price(data)
+        if errors:
+            raise ValueError(f"final_price extraction failed validation twice: {errors}")
+    return data
