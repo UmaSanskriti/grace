@@ -206,19 +206,38 @@ def _nego_status(n: dict) -> str:
     return "agreed" if n.get("agreed") else "no_agreement"
 
 
-def _calls(case: dict) -> list[dict]:
-    out: list[dict] = []
+def _intake_calls(case_id: str) -> list[dict]:
+    """Intake conversations for this case, recovered from the conversation index.
+
+    Intake leaves no per-call artifact the way quotes and negotiations do, so the
+    index is the only record that it happened. The dashboard needs it: on an
+    inbound demo the consumer's own call is the one worth watching.
+    """
+    idx = storage._read_json(storage.INDEX_PATH, {}) or {}
+    return [
+        {"purpose": "intake", "provider_id": None, "status": "done",
+         "conversation_id": conv}
+        for conv, meta in idx.items()
+        if meta.get("case_id") == case_id and meta.get("agent_type") == "intake"
+    ]
+
+
+def _calls(case: dict, case_id: str) -> list[dict]:
+    out: list[dict] = _intake_calls(case_id)
     for q in case.get("quotes") or []:
         out.append({
             "purpose": "initial_quote",
             "provider_id": q.get("funeral_home_id"),
             "status": _quote_status(q),
+            # Lets the UI poll /call-transcript without a manual launch.
+            "conversation_id": q.get("call_id"),
         })
     for n in case.get("negotiations") or []:
         out.append({
             "purpose": "negotiation",
             "provider_id": n.get("funeral_home_id"),
             "status": _nego_status(n),
+            "conversation_id": n.get("call_id"),
         })
     return out
 
@@ -284,7 +303,7 @@ def agent_activity(case_id: str | None = None) -> dict:
         },
         "active_node": _active_node(nodes),
         "nodes": nodes,
-        "calls": _calls(case),
+        "calls": _calls(case, case_id),
         "events": _events(case),
         "summary": _summary(case),
     }

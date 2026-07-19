@@ -21,7 +21,12 @@ interface Activity {
   case: { case_id: string; status: string; progress: number; preferred_channel: string; current_version: number };
   active_node: string | null;
   nodes: ActNode[];
-  calls: { purpose: string; provider_id: string | null; status: string }[];
+  calls: {
+    purpose: string;
+    provider_id: string | null;
+    status: string;
+    conversation_id?: string | null;
+  }[];
   events: { type: string; actor: string; timestamp: string }[];
   summary: { quotes: number; audited: number; audit_flags: number; is_tie: boolean | null; recommended: string | null };
 }
@@ -35,16 +40,8 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
-  return data as T;
-}
+// No POST helper here on purpose: this view is read-only. The family dials
+// Grace and the pipeline drives itself — nothing in the dashboard places a call.
 
 interface LaunchedCall { label: string; conversation_id: string; provider_id?: string }
 
@@ -346,45 +343,39 @@ export default function AgentLoop() {
   const simProg = useRef(0);
   const [, force] = useState(0);
 
-  // "Run it live" controls.
-  const [consumerNum, setConsumerNum] = useState("+16172330662");
-  const [houseNum, setHouseNum] = useState("+16507327964");
-  const [providerId, setProviderId] = useState("demo_transparent");
-  const [launching, setLaunching] = useState("");
-  const [launchMsg, setLaunchMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [launched, setLaunched] = useState<LaunchedCall[]>([]);
+  // Case ids we have already seen, so a genuinely new one can be told apart
+  // from the list simply reloading. Seeded on the first poll.
+  const seenCases = useRef<Set<string> | null>(null);
 
-  const callConsumer = async () => {
-    setLaunching("intake"); setLaunchMsg(null);
-    try {
-      const r = await post<{ case_id: string; conversation_id: string | null; status: string }>(
-        "/demo-call", { kind: "intake", to: consumerNum });
-      setCaseId(r.case_id); setSim(false);
-      if (r.conversation_id) setLaunched((p) => [{ label: `Grace Intake → consumer ${consumerNum.slice(-4)}`, conversation_id: r.conversation_id! }, ...p]);
-      setLaunchMsg({ ok: true, text: `Intake call ringing ${consumerNum}. Pick up!` });
-    } catch (e) { setLaunchMsg({ ok: false, text: String(e instanceof Error ? e.message : e) }); }
-    finally { setLaunching(""); }
-  };
-
-  const callHouse = async () => {
-    if (!caseId) { setLaunchMsg({ ok: false, text: "Run the consumer intake call first (it creates the case)." }); return; }
-    setLaunching("caller"); setLaunchMsg(null);
-    try {
-      const r = await post<{ case_id: string; provider_id: string; conversation_id: string | null; status: string }>(
-        "/demo-call", { kind: "caller", to: houseNum, provider_id: providerId, case_id: caseId });
-      setSim(false);
-      if (r.conversation_id) setLaunched((p) => [{ label: `Grace Caller → ${r.provider_id} (${houseNum.slice(-4)})`, conversation_id: r.conversation_id!, provider_id: r.provider_id }, ...p]);
-      setLaunchMsg({ ok: true, text: `Caller call ringing ${houseNum} as ${providerId}. Answer as the funeral home!` });
-    } catch (e) { setLaunchMsg({ ok: false, text: String(e instanceof Error ? e.message : e) }); }
-    finally { setLaunching(""); }
-  };
-
-  // Load recent cases once.
+  // Poll the case list and jump to any case that appears while we watch.
+  // The demo is inbound: the family dials Grace, and the case only shows up
+  // when the post-call webhook lands, so this is how the dashboard finds it.
   useEffect(() => {
-    get<{ cases: CaseRow[] }>("/agent-activity")
-      .then((r) => { setCases(r.cases); if (!caseId && r.cases[0]) setCaseId(r.cases[0].case_id); })
-      .catch((e) => setErr(String(e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+    const tick = () => {
+      get<{ cases: CaseRow[] }>("/agent-activity")
+        .then((r) => {
+          if (!alive) return;
+          setCases(r.cases);
+
+          if (seenCases.current === null) {
+            // First load: adopt the newest case without treating it as "new".
+            seenCases.current = new Set(r.cases.map((c) => c.case_id));
+            setCaseId((cur) => cur || r.cases[0]?.case_id || "");
+            return;
+          }
+          const fresh = r.cases.find((c) => !seenCases.current!.has(c.case_id));
+          r.cases.forEach((c) => seenCases.current!.add(c.case_id));
+          if (fresh) {
+            setCaseId(fresh.case_id);
+            setSim(false); // a real case beats the simulation
+          }
+        })
+        .catch((e) => { if (alive) setErr(String(e)); });
+    };
+    tick();
+    const t = setInterval(tick, 3000);
+    return () => { alive = false; clearInterval(t); };
   }, []);
 
   // Poll the selected case live (unless simulating).
@@ -416,6 +407,25 @@ export default function AgentLoop() {
   }, [sim]);
 
   const view = data;
+
+  // Transcript panels for every call the case actually made. Intake first —
+  // on an inbound demo that is the family's own call.
+  const transcriptCalls = useMemo<LaunchedCall[]>(() => {
+    const label = (c: Activity["calls"][number]) =>
+      c.purpose === "intake"
+        ? "Grace Intake ← family"
+        : c.purpose === "negotiation"
+          ? `Grace Closer → ${c.provider_id ?? "provider"}`
+          : `Grace Caller → ${c.provider_id ?? "provider"}`;
+    return (view?.calls ?? [])
+      .filter((c): c is Activity["calls"][number] & { conversation_id: string } =>
+        Boolean(c.conversation_id))
+      .map((c) => ({
+        label: label(c),
+        conversation_id: c.conversation_id,
+        provider_id: c.provider_id ?? undefined,
+      }));
+  }, [view]);
   const activePipe = useMemo(() => {
     if (!view) return -1;
     return PIPELINE.findIndex((s) => s.derive(view).state === "active");
@@ -480,50 +490,14 @@ export default function AgentLoop() {
         </div>
       </div>
 
-      {/* Run it live: place the real calls */}
-      <div className="rounded-xl border-2 border-teal-200 bg-teal-50/50 p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <PhoneCall className="h-4 w-4 text-teal-700" />
-          <span className="text-sm font-bold text-teal-900">Run it live — place the real calls</span>
-          <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-semibold text-teal-800">1 consumer + 1 funeral house</span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-grace-border bg-white p-3">
-            <div className="mb-1 text-xs font-semibold text-grace-muted">1 · Consumer (Grace Intake Agent calls them)</div>
-            <input value={consumerNum} onChange={(e) => setConsumerNum(e.target.value)}
-              className="mb-2 w-full rounded-md border border-grace-border px-2 py-1 font-mono text-sm" />
-            <button onClick={callConsumer} disabled={launching !== ""}
-              className="w-full rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">
-              {launching === "intake" ? "Dialing…" : "📞 Call consumer (Intake)"}
-            </button>
-          </div>
-          <div className="rounded-lg border border-grace-border bg-white p-3">
-            <div className="mb-1 text-xs font-semibold text-grace-muted">2 · Funeral house (Grace Caller Agent calls them)</div>
-            <div className="mb-2 flex gap-2">
-              <input value={houseNum} onChange={(e) => setHouseNum(e.target.value)}
-                className="w-full rounded-md border border-grace-border px-2 py-1 font-mono text-sm" />
-              <select value={providerId} onChange={(e) => setProviderId(e.target.value)}
-                className="rounded-md border border-grace-border px-2 py-1 text-sm">
-                <option value="demo_transparent">Transparent (A)</option>
-                <option value="demo_package_first">Package-first (B)</option>
-                <option value="demo_hidden_fee">Hidden-fee (C)</option>
-              </select>
-            </div>
-            <button onClick={callHouse} disabled={launching !== "" || !caseId}
-              className="w-full rounded-md bg-indigo-700 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-50">
-              {launching === "caller" ? "Dialing…" : "📞 Call funeral house (Caller)"}
-            </button>
-            {!caseId && <div className="mt-1 text-[10px] text-grace-muted">Run the consumer call first (creates the case).</div>}
-          </div>
-        </div>
-        {launchMsg && (
-          <div className={`mt-3 rounded-md px-3 py-2 text-sm ${launchMsg.ok ? "bg-emerald-50 text-emerald-800" : "bg-grace-dangerSoft text-grace-danger"}`}>
-            {launchMsg.text}
-          </div>
-        )}
-        <div className="mt-2 text-[11px] text-grace-muted">
-          Both numbers must be allowlisted + consented. You’ll roleplay the funeral home when the Caller rings. 2 more numbers later → full 3-provider run.
-        </div>
+      {/* The consumer dials Grace; the loop starts itself. Outbound "run it
+          live" controls were removed — nothing here places a call. */}
+      <div className="flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50/50 px-4 py-3">
+        <PhoneCall className="h-4 w-4 shrink-0 text-teal-700" />
+        <span className="text-sm font-semibold text-teal-900">Waiting for the family to call Grace</span>
+        <span className="text-[11px] text-teal-800">
+          The case appears here once the intake call ends, then the loop runs itself.
+        </span>
       </div>
 
       {err && !view && (
@@ -576,12 +550,14 @@ export default function AgentLoop() {
             </div>
           </div>
 
-          {/* Call transcripts (real calls) */}
-          {launched.length > 0 && (
+          {/* Call transcripts — every call on this case, including the
+              consumer's own inbound intake. Driven by the case record rather
+              than by manual launches, so an inbound demo still shows them. */}
+          {transcriptCalls.length > 0 && (
             <div className="space-y-3">
               <div className="text-sm font-bold" style={{ color: "#12213f" }}>Call transcripts</div>
               <div className="grid gap-3 lg:grid-cols-2">
-                {launched.map((c) => <CallTranscript key={c.conversation_id} call={c} />)}
+                {transcriptCalls.map((c) => <CallTranscript key={c.conversation_id} call={c} />)}
               </div>
             </div>
           )}
