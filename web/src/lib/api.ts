@@ -1,7 +1,7 @@
-// Typed fetch client for the Grace Edge Function endpoints (spec §6.3).
+// Typed fetch client for the Grace backend (the FastAPI app under `app/`).
 // All external vendor APIs (Twilio/ElevenLabs/OpenAI/Tavily) are server-side
-// only; this client talks solely to the Grace Edge Functions using the anon
-// key (§10 — never a service key in browser code).
+// only — no vendor credential ever belongs in browser code. The backend has no
+// auth gate, so this client sends no auth headers.
 
 import type {
   CaseContextResponse,
@@ -15,9 +15,6 @@ const BASE_URL: string =
     /\/+$/,
     ""
   ) ?? "";
-
-const ANON_KEY: string =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? "";
 
 export class ApiError extends Error {
   status: number;
@@ -41,7 +38,7 @@ async function request<T>(
   if (!BASE_URL) {
     throw new ApiError(
       0,
-      "VITE_APP_BASE_URL is not set. Copy .env.example to .env and point it at your Grace Edge Functions."
+      "VITE_APP_BASE_URL is not set. Copy .env.example to .env and point it at the Grace backend."
     );
   }
 
@@ -49,11 +46,6 @@ async function request<T>(
     "Content-Type": "application/json",
     ...(init.headers as Record<string, string> | undefined),
   };
-  // Supabase Edge Functions gate on the anon key.
-  if (ANON_KEY) {
-    headers["apikey"] = ANON_KEY;
-    headers["Authorization"] = `Bearer ${ANON_KEY}`;
-  }
 
   let res: Response;
   try {
@@ -89,9 +81,16 @@ async function request<T>(
 }
 
 export const api = {
-  // NOTE: Supabase serves each Edge Function at /functions/v1/<function-name>,
-  // so VITE_APP_BASE_URL ends in /functions/v1 and paths are the hyphenated
-  // function names (not the spec's clean /demo/enroll paths).
+  // NOTE (issue #12): VITE_APP_BASE_URL now points straight at the FastAPI
+  // backend's root — there is no /functions/v1 prefix any more.
+  //
+  // The three calls below are NOT yet implemented by that backend: it serves
+  // /agent-activity, /call-transcript, /demo-call, /cases/{id} and
+  // /cases/{id}/report, and nothing answers these hyphenated paths. They are
+  // left verbatim rather than remapped onto guessed equivalents — /cases/{id}
+  // returns the raw case dump, not CaseContextResponse, and /cases/{id}/report
+  // returns text/markdown, not CaseReportResponse. Enroll has no counterpart at
+  // all. Reconciling these routes is follow-up work, tracked separately.
 
   /** POST demo-enroll — create case, validate allowlist, store consent. */
   enroll(body: EnrollRequest): Promise<EnrollResponse> {
