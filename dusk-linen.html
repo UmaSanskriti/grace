@@ -1,0 +1,1222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grace — Someone to make the funeral home calls</title>
+<meta name="description" content="Grace is an AI advocate for families arranging a funeral. Say it once; Grace calls nearby funeral homes for itemized, comparable quotes and explains them in plain language. Every decision stays with you.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F1F0F2">
+<meta property="og:title" content="Grace — Someone to make the funeral home calls">
+<meta property="og:description" content="Say it once. Grace calls nearby funeral homes, gathers itemized quotes, and explains the differences in plain language. Every decision stays with you.">
+<!-- No external resources: system font stacks only. -->
+<style>
+
+/* ————————————————————————————————————————
+   Tokens — “dusk linen” system
+   ———————————————————————————————————————— */
+:root{
+  --serif:Palatino,"Palatino Linotype","Book Antiqua",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --linen:#F1F0F2;        /* page ground: cool pale linen at dusk */
+  --card:#FAF9FB;         /* raised surfaces */
+  --ink:#24222A;          /* plum-charcoal text */
+  --ink-2:#5B5865;        /* muted text (≥4.5:1 on linen) */
+  --laurel:#2E5546;       /* trust green: actions */
+  --laurel-deep:#24443A;  /* hover/active */
+  --laurel-tint:#E5ECE7;  /* soft green fills */
+  --candle:#79601F;       /* engraved gold: overlines, numerals */
+  --candle-soft:#C7A45C;  /* decorative strokes only */
+  --warn-bg:#F3E7C9;
+  --warn-ink:#6E4E12;
+  --danger:#8F3B2C;
+  --line:rgba(36,34,42,.16);
+  --ring:#2E5546;
+  --bar-h:74px;
+  --radius:14px;
+}
+
+/* ————————————————————————————————————————
+   Base
+   ———————————————————————————————————————— */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--linen);
+  color:var(--ink);
+  font:400 1.0625rem/1.65 var(--sans);
+  padding-bottom:calc(var(--bar-h) + env(safe-area-inset-bottom));
+}
+[hidden]{display:none !important}
+img,svg{display:block}
+h1,h2,h3{font-family:var(--serif);font-weight:400;line-height:1.15;margin:0 0 .5rem;letter-spacing:.005em}
+p{margin:0 0 1rem}
+strong{font-weight:600}
+::selection{background:var(--laurel);color:var(--card)}
+:where(a,button,input,summary):focus-visible{outline:3px solid var(--ring);outline-offset:2px;border-radius:6px}
+a{color:var(--laurel)}
+.g-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.g-skip{position:absolute;left:1rem;top:-3rem;background:var(--ink);color:var(--card);padding:.6rem 1rem;border-radius:8px;z-index:60;transition:top .15s;border:0;font:inherit;cursor:pointer}
+.g-skip:focus{top:1rem}
+.g-wrap{max-width:42rem;margin-inline:auto;padding-inline:1.25rem}
+
+/* ————————————————————————————————————————
+   Buttons — 52px targets, plain verbs
+   ———————————————————————————————————————— */
+.g-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.55rem;
+  min-height:52px;padding:.4rem 1.5rem;border-radius:999px;
+  font:600 1.0625rem/1.2 var(--sans);letter-spacing:.01em;
+  border:1.5px solid transparent;cursor:pointer;text-decoration:none;
+  transition:background-color .15s,color .15s,border-color .15s,transform .1s;
+}
+.g-btn svg{flex:none}
+.g-btn-fill{background:var(--laurel);color:var(--card)}
+.g-btn-fill:hover{background:var(--laurel-deep)}
+.g-btn-line{border-color:var(--laurel);color:var(--laurel);background:transparent}
+.g-btn-line:hover{background:var(--laurel-tint)}
+.g-btn-quiet{background:none;border:none;color:var(--ink-2);min-height:48px;padding:.4rem 1rem;font:500 1rem var(--sans);cursor:pointer;border-radius:999px}
+.g-btn-quiet:hover{color:var(--ink)}
+.g-btn-danger-quiet{color:var(--danger)}
+.g-btn-danger-quiet:hover{color:var(--danger)}
+@media (prefers-reduced-motion:no-preference){
+  .g-btn:active{transform:translateY(1px)}
+}
+
+/* ————————————————————————————————————————
+   Header
+   ———————————————————————————————————————— */
+.g-site-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;max-width:64rem;margin-inline:auto;padding:1rem 1.25rem}
+.g-brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;color:var(--ink);background:none;border:0;padding:0;font:inherit;cursor:pointer;text-align:left}
+.g-brand-name{font-family:var(--serif);font-size:1.4rem;letter-spacing:.04em}
+.g-brand-role{font-size:.78rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2)}
+.g-head-nav{display:none}
+.g-head-cta{display:none}
+@media (min-width:880px){
+  .g-head-nav{display:flex;gap:1.6rem}
+  .g-head-nav .g-head-link{font-weight:600;font-size:.98rem;font-family:inherit;color:var(--ink-2);background:none;border:0;cursor:pointer;padding:.65rem .15rem}
+  .g-head-nav .g-head-link:hover{color:var(--ink)}
+  .g-head-nav .g-head-link[aria-current="page"]{color:var(--laurel-deep);box-shadow:inset 0 -2px 0 var(--laurel)}
+  .g-head-cta{display:inline-flex;min-height:46px}
+}
+@media (max-width:420px){.g-brand-role{display:none}}
+
+/* ————————————————————————————————————————
+   Hero — the thesis, under the arch
+   ———————————————————————————————————————— */
+.g-hero{position:relative;overflow:hidden;padding:2.5rem 0 3.25rem}
+.g-hero-orn{position:absolute;right:-72px;top:-36px;width:min(330px,58vw);height:auto;pointer-events:none;z-index:0}
+.g-hero .g-wrap{position:relative;z-index:1;max-width:46rem}
+.g-overline{font-size:.78rem;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--candle);margin:0 0 .9rem}
+.g-hero h1{font-size:clamp(2.05rem,5.2vw + 1rem,3.3rem);max-width:15ch;margin-bottom:.9rem}
+.g-lede{font-size:1.125rem;color:var(--ink-2);max-width:34rem;margin-bottom:1.6rem}
+.g-cta-row{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.15rem}
+.g-deadline{font-size:.95rem;color:var(--ink-2);max-width:32rem;margin:0}
+.g-deadline strong{color:var(--ink)}
+
+/* ————————————————————————————————————————
+   Section furniture
+   ———————————————————————————————————————— */
+.g-section{padding:3.25rem 0}
+[hidden]{display:none!important}
+.g-divider{display:flex;justify-content:center;color:var(--candle-soft);padding:.25rem 0}
+.g-section h2{font-size:clamp(1.55rem,2.6vw + .8rem,2.05rem);margin-bottom:.4rem}
+.g-section-lede{color:var(--ink-2);margin-bottom:2rem;max-width:32rem}
+
+/* Steps — a true sequence */
+.g-steps{list-style:none;margin:0;padding:0;display:grid;gap:1.9rem}
+.g-steps li{display:grid;grid-template-columns:3rem 1fr;gap:.4rem 1rem;align-items:start}
+.g-step-n{font-family:var(--serif);font-size:2.15rem;line-height:1;color:var(--candle);padding-top:.15rem}
+.g-steps h3{font-size:1.3rem;margin-bottom:.35rem}
+.g-steps p{margin:0;color:var(--ink-2)}
+
+/* Example comparison card */
+.g-example{grid-column:2;margin:1.1rem 0 0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 1px 2px rgba(36,34,42,.05),0 8px 24px rgba(36,34,42,.06)}
+.g-example figcaption{font-size:.78rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--candle);padding:.85rem 1.1rem .1rem}
+.g-quote{padding:.85rem 1.1rem 1rem}
+.g-quote + .g-quote{border-top:1px solid var(--line)}
+.g-quote-head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:.45rem}
+.g-quote-name{font-family:var(--serif);font-size:1.08rem}
+.g-quote-price{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-quote-price small{font-weight:500;color:var(--ink-2)}
+.g-tags{display:flex;flex-wrap:wrap;align-items:flex-start;gap:.4rem;margin:0;padding:0;list-style:none}
+.g-tag{display:inline-flex;align-items:center;gap:.32rem;font-size:.82rem;font-weight:500;border-radius:8px;padding:.22rem .55rem;background:var(--laurel-tint);color:var(--laurel);text-align:left;width:fit-content}
+.g-tag svg,.g-ico{flex:none}
+.g-tag-warn{background:var(--warn-bg);color:var(--warn-ink)}
+.g-example-foot{padding:.75rem 1.1rem .95rem;border-top:1px solid var(--line);font-size:.9rem;color:var(--ink-2);margin:0}
+
+/* Boundaries */
+.g-nevers{list-style:none;margin:0 0 2.6rem;padding:0;display:grid;gap:1.35rem}
+.g-nevers h3{font-size:1.18rem;margin-bottom:.25rem}
+.g-nevers p{margin:0;color:var(--ink-2)}
+
+/* FAQ */
+.g-faq h3{font-size:1.35rem;margin-bottom:.4rem}
+.g-faq details{border-bottom:1px solid var(--line)}
+.g-faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:44px;padding:.95rem .2rem;font-weight:600;font-size:1.02rem}
+.g-faq summary::-webkit-details-marker{display:none}
+.g-faq summary::after{content:"+";font-family:var(--serif);font-size:1.5rem;line-height:1;color:var(--candle);transition:transform .18s;flex:none}
+.g-faq details[open] summary::after{transform:rotate(45deg)}
+.g-faq details p{color:var(--ink-2);margin:0 0 1.1rem;padding-right:2rem}
+
+/* ————————————————————————————————————————
+   Footer
+   ———————————————————————————————————————— */
+.g-site-foot{border-top:1px solid var(--line);margin-top:1.5rem;padding:2.25rem 0 2.5rem;font-size:.92rem;color:var(--ink-2)}
+.g-site-foot .g-brand-name{font-size:1.25rem;color:var(--ink);display:block;margin-bottom:.6rem}
+.g-site-foot nav{margin:.9rem 0}
+.g-site-foot .g-link-btn{font-size:inherit}
+.g-foot-dead{color:var(--ink-2)}
+.g-demo-note{font-size:.83rem;opacity:.85;margin:0}
+
+/* ————————————————————————————————————————
+   Persistent action bar (mobile)
+   ———————————————————————————————————————— */
+.g-bottomnav{
+  position:fixed;inset-inline:0;bottom:0;z-index:40;
+  display:flex;
+  padding:.4rem .6rem calc(.4rem + env(safe-area-inset-bottom));
+  background:rgba(250,249,251,.93);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+}
+.g-bn-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.22rem;min-height:56px;border-radius:14px;
+  color:var(--ink-2);text-decoration:none;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;letter-spacing:.01em;
+}
+.g-bn-pill{display:grid;place-items:center;min-width:3.4rem;padding:.2rem 0;border-radius:999px}
+.g-bn-item[aria-current="page"]{color:var(--laurel-deep)}
+.g-bn-item[aria-current="page"] .g-bn-pill{background:var(--laurel-tint)}
+@media (min-width:880px){
+  .g-bottomnav{display:none}
+  body{padding-bottom:0}
+}
+
+/* Status banner — visible system status after the sheet closes */
+.g-statusbar{
+  position:fixed;left:.9rem;right:.9rem;z-index:45;
+  bottom:calc(var(--bar-h) + env(safe-area-inset-bottom) + .7rem);
+  display:flex;align-items:center;gap:.6rem;
+  background:var(--ink);color:var(--card);
+  border-radius:14px;padding:.55rem .55rem .55rem 1rem;
+  box-shadow:0 10px 30px rgba(36,34,42,.28);
+  font-size:.95rem;
+}
+.g-statusbar p{margin:0;flex:1;min-width:0}
+.g-statusbar button{min-width:44px;min-height:44px;border:none;background:none;color:var(--card);cursor:pointer;border-radius:10px;font:600 .92rem var(--sans);display:inline-flex;align-items:center;justify-content:center;padding:0 .6rem}
+.g-statusbar button:hover{background:rgba(250,249,251,.14)}
+.g-statusbar .g-statusbar-cancel{text-decoration:underline;text-underline-offset:3px}
+@media (min-width:880px){.g-statusbar{bottom:1.1rem;left:auto;right:1.25rem;max-width:26rem}}
+
+/* ————————————————————————————————————————
+   Bottom sheet — the only “form”, kept tiny
+   ———————————————————————————————————————— */
+.g-sheet-root{position:fixed;inset:0;z-index:50}
+.g-backdrop{position:absolute;inset:0;background:rgba(30,28,36,.46);opacity:0;transition:opacity .22s}
+.g-sheet{
+  position:absolute;left:0;right:0;bottom:0;
+  max-height:88vh;max-height:88dvh;overflow:auto;
+  background:var(--card);color:var(--ink);
+  border-radius:22px 22px 0 0;
+  padding:1rem 1.25rem calc(1.4rem + env(safe-area-inset-bottom));
+  box-shadow:0 -18px 50px rgba(36,34,42,.30);
+  transform:translateY(102%);
+  transition:transform .26s cubic-bezier(.32,.72,.33,1);
+}
+.g-sheet-root.g-open .g-backdrop{opacity:1}
+.g-sheet-root.g-open .g-sheet{transform:translateY(0)}
+.g-sheet-grip{width:44px;height:4px;border-radius:2px;background:var(--line);margin:0 auto .35rem}
+.g-sheet-close{position:absolute;top:.6rem;right:.6rem;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:none;background:none;color:var(--ink-2);cursor:pointer;border-radius:12px}
+.g-sheet-close:hover{color:var(--ink);background:var(--linen)}
+.g-sheet h2{font-size:1.45rem;margin:0.4rem 2.5rem .9rem 0}
+#sheetTitle:focus{outline:none}
+
+/* choose call / text — recognition over recall */
+.g-seg{border:none;margin:0 0 .5rem;padding:4px;background:var(--linen);border-radius:999px;display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.g-seg input{position:absolute;width:1px;height:1px;opacity:0}
+.g-seg label{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;border-radius:999px;font-weight:600;font-size:1rem;color:var(--ink-2);cursor:pointer;transition:background-color .15s,color .15s}
+.g-seg input:checked + label{background:var(--laurel);color:var(--card)}
+.g-seg input:focus-visible + label{outline:3px solid var(--ring);outline-offset:2px}
+.g-mode-hint{font-size:.92rem;color:var(--ink-2);margin:0 0 1.15rem;min-height:2.6em}
+
+.g-field-label{display:block;font-weight:600;font-size:.98rem;margin-bottom:.35rem}
+.g-field-help{font-size:.86rem;color:var(--ink-2);margin:.3rem 0 0}
+input[type=tel]{
+  width:100%;min-height:52px;padding:.7rem .95rem;
+  font:500 1.0625rem var(--sans);color:var(--ink);
+  background:var(--card);border:1.5px solid var(--line);border-radius:12px;
+}
+input[type=tel]:focus-visible{outline:3px solid var(--ring);outline-offset:2px;border-color:var(--laurel)}
+input[aria-invalid="true"]{border-color:var(--danger)}
+.g-err{color:var(--danger);font-size:.9rem;font-weight:500;margin:.35rem 0 0;min-height:1.2em}
+
+.g-consent{display:flex;gap:.7rem;align-items:flex-start;margin:1.1rem 0 .2rem;padding:.8rem .85rem;border:1px solid var(--line);border-radius:12px;cursor:pointer}
+.g-consent input{width:22px;height:22px;margin:.1rem 0 0;accent-color:var(--laurel);flex:none;cursor:pointer}
+.g-consent span{font-size:.95rem;line-height:1.5}
+
+.g-sheet-actions{display:flex;flex-direction:column;gap:.35rem;margin-top:1.1rem}
+.g-sheet-actions .g-btn{width:100%}
+.g-privacy-line{font-size:.85rem;color:var(--ink-2);text-align:center;margin:.8rem 0 0}
+
+/* Status views inside the sheet */
+.g-status-view{text-align:center;padding:.6rem 0 .2rem}
+.g-status-arch{width:92px;height:74px;margin:0 auto .9rem;position:relative;display:flex;align-items:flex-end;justify-content:center}
+.g-status-arch svg{position:relative;z-index:1}
+@media (prefers-reduced-motion:no-preference){
+  .g-status-arch.g-pulse::after{
+    content:"";position:absolute;left:50%;bottom:2px;width:58px;height:58px;
+    transform:translateX(-50%);border-radius:50%;
+    border:2px solid var(--candle-soft);opacity:0;
+    animation:g-halo 1.9s ease-out infinite;
+  }
+  @keyframes g-halo{0%{opacity:.55;scale:.72}70%{opacity:0;scale:1.25}100%{opacity:0;scale:1.25}}
+}
+.g-status-body{color:var(--ink-2);max-width:26rem;margin:0 auto 1.2rem}
+.g-status-actions{display:flex;flex-direction:column;gap:.3rem;align-items:stretch}
+.g-status-actions .g-btn{width:100%}
+
+/* Desktop: the sheet becomes a centered card */
+@media (min-width:720px){
+  .g-sheet{
+    left:50%;right:auto;bottom:auto;top:50%;
+    width:min(94vw,27rem);
+    border-radius:20px;
+    padding:1.4rem 1.6rem 1.6rem;
+    transform:translate(-50%,-46%);opacity:0;
+    transition:transform .22s ease,opacity .22s ease;
+  }
+  .g-sheet-root.g-open .g-sheet{transform:translate(-50%,-50%);opacity:1}
+  .g-sheet-grip{display:none}
+}
+
+@media (min-width:880px){
+  .g-hero{padding:4.5rem 0 4.5rem}
+  .g-section{padding:4.5rem 0}
+}
+
+/* Motion restraint */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none !important;animation:none !important;scroll-behavior:auto !important}
+}
+/* ————————————————————————————————————————
+   Arrangements page — empty state + live sample
+   ———————————————————————————————————————— */
+#progress{scroll-margin-top:1rem}
+.g-end-cta{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.g-end-cta p{margin:0 0 1rem;color:var(--ink-2);max-width:30rem}
+.g-dash-empty{border:1.5px dashed #C9C7D2;border-radius:var(--radius);padding:1.35rem 1.25rem 1.15rem}
+.g-ghost-list{list-style:none;margin:0 0 1.25rem;padding:0;display:grid;gap:1.05rem}
+.g-ghost-list li{display:grid;grid-template-columns:2.2rem 1fr;gap:0 .9rem;align-items:start}
+.g-ghost-dot{width:2.2rem;height:2.2rem;border-radius:50%;border:2px dashed #C4C2CC;color:var(--ink-2);display:grid;place-items:center;font-family:var(--serif);font-size:1rem}
+.g-ghost-list strong{display:block;font-weight:600;color:var(--ink);padding-top:.2rem}
+.g-ghost-list p{margin:.12rem 0 0;color:var(--ink-2);font-size:.95rem}
+.g-dash-empty-foot{display:flex;align-items:center;gap:.9rem;flex-wrap:wrap}
+.g-dash-empty-foot p{margin:0;font-size:.9rem;color:var(--ink-2)}
+
+.g-dash-top{margin-bottom:1.7rem}
+.g-dash-greet{font-family:var(--serif);font-weight:400;font-size:clamp(1.35rem,2vw + .9rem,1.6rem);margin:0 0 .35rem}
+.g-dash-updated{margin:0;color:var(--ink-2);font-size:.95rem}
+.g-link-btn{font:inherit;font-size:.95rem;color:var(--laurel);text-decoration:underline;text-underline-offset:3px;background:none;border:0;cursor:pointer;border-radius:6px;padding:.15rem .25rem;margin:-.15rem -.25rem}
+.g-dash-hide{display:inline-block;margin:.55rem 0 0;padding:.4rem .25rem .4rem 0}
+.g-link-btn:hover{color:var(--laurel-deep)}
+
+.g-tl{list-style:none;margin:0;padding:0}
+.g-tl-item{position:relative;display:grid;grid-template-columns:2.5rem 1fr;gap:0 1rem;padding-bottom:2rem}
+.g-tl-item:last-child{padding-bottom:0}
+.g-tl-item:not(:last-child)::before{content:"";position:absolute;left:calc(1.25rem - 1px);top:2.75rem;bottom:.25rem;width:2px;background:var(--line)}
+.g-tl-dot{width:2.5rem;height:2.5rem;border-radius:50%;display:grid;place-items:center;font-family:var(--serif);font-size:1.12rem;position:relative;z-index:1}
+.g-is-live .g-tl-dot{background:var(--laurel);color:var(--card)}
+.g-is-next .g-tl-dot{background:transparent;border:2px dashed #C4C2CC;color:var(--ink-2)}
+.g-tl-head{display:flex;justify-content:space-between;align-items:baseline;gap:.35rem .85rem;flex-wrap:wrap;margin:.3rem 0 .55rem}
+.g-tl-head h4{font-family:var(--serif);font-weight:400;font-size:1.2rem;margin:0}
+.g-chip{font-size:.78rem;font-weight:600;letter-spacing:.02em;border-radius:999px;padding:.26rem .66rem;white-space:nowrap}
+.g-chip-live{background:var(--warn-bg);color:var(--warn-ink)}
+.g-chip-done{background:var(--laurel-tint);color:var(--laurel-deep)} /* used once stages complete */
+.g-chip-next{background:#E9E8EE;color:var(--ink-2)}
+
+.g-stage-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:1rem 1.1rem;box-shadow:0 1px 2px rgba(36,34,42,.05)}
+.g-stage-card > p{margin:0 0 .6rem;color:var(--ink)}
+.g-req-list,.g-ask-list{list-style:none;margin:0;padding:0;display:grid;gap:.5rem;color:var(--ink-2);font-size:.98rem}
+.g-req-list li,.g-ask-list li{position:relative;padding-left:1.45rem}
+.g-req-list li::before{content:"\2713";position:absolute;left:.1rem;top:0;color:var(--laurel);font-weight:600}
+.g-ask-list li::before{content:"\2192";position:absolute;left:.05rem;top:0;color:var(--candle)}
+.g-open-item{margin-top:1rem;padding:.85rem .95rem;background:var(--warn-bg);border-radius:10px;color:var(--warn-ink)}
+.g-open-item p{margin:0 0 .7rem;font-size:.95rem}
+.g-mini-cta{display:flex;gap:.6rem;flex-wrap:wrap}
+
+.g-home{padding:.85rem 0}
+.g-home:first-child{padding-top:.1rem}
+.g-home + .g-home{border-top:1px dashed var(--line)}
+.g-home-head{display:flex;justify-content:space-between;align-items:baseline;gap:.35rem 1rem;flex-wrap:wrap;margin-bottom:.4rem}
+.g-home-name{font-family:var(--serif);font-size:1.05rem}
+.g-home-price{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-home-price small{font-weight:500;color:var(--ink-2)}
+.g-tag-mute{background:#E9E8EE;color:var(--ink-2)}
+.g-stage-card p.g-wait{margin:.8rem 0 0;font-size:.95rem;color:var(--ink-2)}
+.g-stage-card p.g-pay-slot{margin:.9rem 0 0;border:1.5px dashed var(--line);border-radius:10px;padding:.95rem 1rem;color:var(--ink-2);font-size:.95rem;text-align:center}
+
+.g-dash-foot{margin-top:2rem;padding-top:1.25rem;border-top:1px solid var(--line)}
+.g-dash-foot > p:first-child{margin:0 0 .65rem;font-weight:500}
+.g-dash-privacy{font-size:.9rem;color:var(--ink-2);margin:1rem 0 0}
+
+/* ————————————————————————————————————————
+   Mobile refinements (≤560px)
+   ———————————————————————————————————————— */
+@media (max-width:560px){
+  .g-brand-role{display:none}
+  .g-hero{padding:2.1rem 0 2.7rem}
+  .g-section{padding:2.75rem 0}
+  .g-lede{font-size:1.06rem}
+  .g-steps{gap:2.1rem}
+  .g-steps li{grid-template-columns:2.1rem 1fr;gap:.3rem .75rem}
+  .g-step-n{font-size:1.6rem;padding-top:.28rem}
+  .g-example{grid-column:1 / -1}
+  .g-tl-item{grid-template-columns:2.1rem 1fr;gap:0 .75rem;padding-bottom:2.1rem}
+  .g-tl-item > div{display:contents}
+  .g-tl-head{grid-column:2;align-self:center;margin:0}
+  .g-tl-dot{width:2.1rem;height:2.1rem;font-size:.98rem}
+  .g-tl-item:not(:last-child)::before{left:calc(1.05rem - 1px);top:2.45rem}
+  .g-stage-card{grid-column:1 / -1;margin-top:.75rem}
+  .g-dash-empty{padding:1.15rem 1rem 1rem}
+  .g-ghost-list{gap:.9rem}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-call" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<button type="button" class="g-skip" id="skipBtn">Skip to content</button>
+
+<header class="g-site-head" id="siteHead">
+  <button type="button" class="g-brand" data-route="home" aria-label="Grace, funeral arrangements advocate — home">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4.5 21V11.5a7.5 7.5 0 0 1 15 0V21" stroke="#2E5546" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M9 21v-8.2a3 3 0 0 1 6 0V21" stroke="#C7A45C" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="12" cy="7" r="1" fill="#C7A45C"/>
+    </svg>
+    <span class="g-brand-name">Grace</span>
+    <span class="g-brand-role">Funeral arrangements advocate</span>
+  </button>
+  <nav class="g-head-nav" aria-label="Primary">
+    <button type="button" class="g-head-link" data-route="home" aria-current="page">Home</button>
+    <button type="button" class="g-head-link" data-route="progress">Your arrangements</button>
+  </nav>
+  <button type="button" class="g-btn g-btn-fill g-head-cta" id="headCall" data-mode="call" aria-haspopup="dialog">
+    <svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-call"/></svg>
+    Call Grace
+  </button>
+</header>
+
+<main id="main" tabindex="-1">
+
+  <!-- ——— Section 1 · Hero ——— -->
+  <section class="g-hero g-v-home" aria-labelledby="hero-h">
+    <svg class="g-hero-orn" viewBox="0 0 320 360" fill="none" aria-hidden="true">
+      <path d="M40 360V150a120 120 0 0 1 240 0v210" stroke="#2E5546" stroke-opacity=".14" stroke-width="2"/>
+      <path d="M80 360V168a80 80 0 0 1 160 0v192" stroke="#C7A45C" stroke-opacity=".38" stroke-width="1.5"/>
+      <path d="M120 360V188a40 40 0 0 1 80 0v172" stroke="#2E5546" stroke-opacity=".2" stroke-width="1.5"/>
+      <circle cx="160" cy="118" r="9" fill="#C7A45C" fill-opacity=".5"/>
+    </svg>
+    <div class="g-wrap">
+      <p class="g-overline">AI funeral-arrangements advocate</p>
+      <h1 id="hero-h" tabindex="-1">Say it once. Grace makes the calls.</h1>
+      <p class="g-lede">Tell Grace once. She calls nearby funeral homes, gathers itemized quotes you can compare side by side, and explains it all in plain language. Every decision stays with your family.</p>
+      <div class="g-cta-row">
+        <button type="button" class="g-btn g-btn-fill" id="heroCall" data-mode="call" aria-haspopup="dialog">
+          <svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-call"/></svg>
+          Call Grace
+        </button>
+        <button type="button" class="g-btn g-btn-line" id="heroText" data-mode="text" aria-haspopup="dialog">
+          <svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-text"/></svg>
+          Text Grace
+        </button>
+      </div>
+      <p class="g-deadline"><strong>Transfer deadline from a hospital or hospice?</strong> Say so first — Grace starts there.</p>
+    </div>
+  </section>
+
+  <div class="g-divider g-v-home" aria-hidden="true">
+    <svg width="72" height="16" viewBox="0 0 72 16" fill="none"><path d="M4 15V9a8 8 0 0 1 16 0v6" stroke="currentColor" stroke-width="1.5"/><path d="M28 15V9a8 8 0 0 1 16 0v6" stroke="currentColor" stroke-width="1.5"/><path d="M52 15V9a8 8 0 0 1 16 0v6" stroke="currentColor" stroke-width="1.5"/></svg>
+  </div>
+
+  <!-- ——— Section 2 · How it works ——— -->
+  <section class="g-section g-v-home" aria-labelledby="how-h">
+    <div class="g-wrap">
+      <p class="g-overline">How it works</p>
+      <h2 id="how-h">What happens when you reach out</h2>
+      <p class="g-section-lede">Four steps, in order. You can pause or stop at any point.</p>
+      <ol class="g-steps">
+        <li>
+          <span class="g-step-n" aria-hidden="true">1</span>
+          <div>
+            <h3>You talk. Grace listens.</h3>
+            <p>By call or text, in your own words. Share only what you’re comfortable sharing — no budget required.</p>
+          </div>
+        </li>
+        <li>
+          <span class="g-step-n" aria-hidden="true">2</span>
+          <div>
+            <h3>Grace calls the funeral homes.</h3>
+            <p>Each home hears the same confirmed details and is asked for itemized prices in writing.</p>
+          </div>
+        </li>
+        <li>
+          <span class="g-step-n" aria-hidden="true">3</span>
+          <div>
+            <h3>You see a clear comparison.</h3>
+            <p>Price, timing, cultural fit, language — with missing fees and vague answers flagged, not smoothed over.</p>
+          </div>
+          <figure class="g-example">
+            <figcaption>Example · how Grace reports back</figcaption>
+            <div class="g-quote">
+              <div class="g-quote-head">
+                <span class="g-quote-name">Hillside Funeral Home</span>
+                <span class="g-quote-price">$4,120 <small>itemized</small></span>
+              </div>
+              <ul class="g-tags">
+                <li class="g-tag">Transfer today</li>
+                <li class="g-tag">Spanish-speaking director</li>
+                <li class="g-tag g-tag-warn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+                  Weekend viewing fee unconfirmed
+                </li>
+              </ul>
+            </div>
+            <div class="g-quote">
+              <div class="g-quote-head">
+                <span class="g-quote-name">Cedar &amp; Vine Cremation</span>
+                <span class="g-quote-price">$2,980 <small>itemized</small></span>
+              </div>
+              <ul class="g-tags">
+                <li class="g-tag">Transfer tomorrow</li>
+                <li class="g-tag g-tag-warn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+                  Death certificates not included
+                </li>
+              </ul>
+            </div>
+            <p class="g-example-foot">Grace lays out the differences. Your family chooses what matters.</p>
+          </figure>
+        </li>
+        <li>
+          <span class="g-step-n" aria-hidden="true">4</span>
+          <div>
+            <h3>Your family decides.</h3>
+            <p>Grace negotiates only what you approve, keeps you posted at each step, and never signs or books anything.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ——— Section 3 · Boundaries & questions ——— -->
+  <!-- ——— Section 3 · Your arrangements ——— -->
+  <section class="g-section" id="progress" hidden aria-labelledby="prog-h">
+    <div class="g-wrap">
+      <p class="g-overline">Once you&rsquo;re in touch</p>
+      <h2 id="prog-h" tabindex="-1">Your arrangements</h2>
+      <p class="g-section-lede">After your first call or text, Grace texts you a private link that opens this page, kept current. No account, no password.</p>
+
+      <div class="g-dash-empty" id="dashEmpty">
+        <ol class="g-ghost-list">
+          <li>
+            <span class="g-ghost-dot" aria-hidden="true">1</span>
+            <div><strong>Your requirements</strong><p>What’s confirmed, and anything still open.</p></div>
+          </li>
+          <li>
+            <span class="g-ghost-dot" aria-hidden="true">2</span>
+            <div><strong>Calls to funeral homes</strong><p>Who she reached, and what each one said.</p></div>
+          </li>
+          <li>
+            <span class="g-ghost-dot" aria-hidden="true">3</span>
+            <div><strong>Negotiating the price</strong><p>Better terms, only with your OK.</p></div>
+          </li>
+          <li>
+            <span class="g-ghost-dot" aria-hidden="true">4</span>
+            <div><strong>Paying the funeral home</strong><p>Paid directly to them &mdash; never through Grace.</p></div>
+          </li>
+        </ol>
+        <div class="g-dash-empty-foot">
+          <button type="button" class="g-btn g-btn-fill" data-mode="call" aria-haspopup="dialog"><svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-call"/></svg> Call Grace</button>
+          <button type="button" class="g-btn g-btn-line" data-mode="text" aria-haspopup="dialog"><svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-text"/></svg> Text Grace</button>
+          <button type="button" class="g-link-btn" id="dashPreview">See a sample with made-up details</button>
+        </div>
+      </div>
+
+      <div id="dashLive" hidden>
+        <div class="g-dash-top">
+          <h3 class="g-dash-greet" id="dashHead" tabindex="-1">Maya, here&rsquo;s where things stand.</h3>
+          <p class="g-dash-updated">Updated 4 min ago &middot; Grace texts you when anything changes.</p>
+          <button type="button" class="g-link-btn g-dash-hide" id="dashHide">Hide this sample</button>
+        </div>
+
+        <ol class="g-tl" aria-label="Where things stand, step by step">
+          <li class="g-tl-item g-is-live">
+            <span class="g-tl-dot" aria-hidden="true">1</span>
+            <div>
+              <div class="g-tl-head"><h4>Your requirements</h4><span class="g-chip g-chip-live">5 of 6 confirmed</span></div>
+              <div class="g-stage-card">
+                <ul class="g-req-list">
+                  <li>Direct cremation, no embalming</li>
+                  <li>Transfer from St.&nbsp;Mary&rsquo;s by tomorrow evening</li>
+                  <li>Service this month at the family&rsquo;s church</li>
+                  <li>Spanish-speaking staff for your mother</li>
+                  <li>Keep the total under $5,000</li>
+                </ul>
+                <div class="g-open-item">
+                  <p><strong>Still open:</strong> where to send the death certificates &mdash; home, or the church office?</p>
+                  <div class="g-mini-cta">
+                    <button type="button" class="g-btn g-btn-fill" data-mode="call" aria-haspopup="dialog"><svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-call"/></svg> Call Grace</button>
+                    <button type="button" class="g-btn g-btn-line" data-mode="text" aria-haspopup="dialog"><svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-text"/></svg> Text Grace</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="g-tl-item g-is-live">
+            <span class="g-tl-dot" aria-hidden="true">2</span>
+            <div>
+              <div class="g-tl-head"><h4>Calls to funeral homes</h4><span class="g-chip g-chip-live">3 of 4 reached</span></div>
+              <div class="g-stage-card">
+                <div class="g-home">
+                  <div class="g-home-head">
+                    <span class="g-home-name">Hillside Funeral Home</span>
+                    <span class="g-home-price">$4,120 <small>itemized</small></span>
+                  </div>
+                  <ul class="g-tags">
+                    <li class="g-tag">Transfer today</li>
+                    <li class="g-tag">Spanish-speaking director</li>
+                    <li class="g-tag g-tag-warn">Weekend viewing fee unconfirmed</li>
+                  </ul>
+                </div>
+                <div class="g-home">
+                  <div class="g-home-head">
+                    <span class="g-home-name">Cedar &amp; Vine Cremation</span>
+                    <span class="g-home-price">$2,980 <small>itemized</small></span>
+                  </div>
+                  <ul class="g-tags">
+                    <li class="g-tag">Transfer tomorrow</li>
+                    <li class="g-tag g-tag-warn">Death certificates not included</li>
+                  </ul>
+                </div>
+                <div class="g-home">
+                  <div class="g-home-head">
+                    <span class="g-home-name">Rosewood Memorial</span>
+                  </div>
+                  <ul class="g-tags">
+                    <li class="g-tag g-tag-warn">No itemized prices by phone &mdash; set aside for now</li>
+                  </ul>
+                </div>
+                <div class="g-home">
+                  <div class="g-home-head">
+                    <span class="g-home-name">Oak &amp; Olive Chapel</span>
+                  </div>
+                  <ul class="g-tags">
+                    <li class="g-tag g-tag-mute">Voicemail left &middot; awaiting a call back</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="g-tl-item g-is-live" aria-current="step">
+            <span class="g-tl-dot" aria-hidden="true">3</span>
+            <div>
+              <div class="g-tl-head"><h4>Negotiating the price</h4><span class="g-chip g-chip-live">Underway</span></div>
+              <div class="g-stage-card">
+                <p>You approved this yesterday. Grace is negotiating with <strong>Cedar &amp; Vine</strong> &mdash; the best fit on price, timing, and language.</p>
+                <ul class="g-ask-list">
+                  <li>Fold the death-certificate copies into the base price</li>
+                  <li>Confirm tomorrow&rsquo;s transfer in writing</li>
+                  <li>Hold the $2,980 quote while you decide</li>
+                </ul>
+                <p class="g-wait">Waiting on their written reply &mdash; nothing is agreed without you.</p>
+              </div>
+            </div>
+          </li>
+
+          <li class="g-tl-item g-is-next">
+            <span class="g-tl-dot" aria-hidden="true">4</span>
+            <div>
+              <div class="g-tl-head"><h4>Paying the funeral home</h4><span class="g-chip g-chip-next">Up next</span></div>
+              <div class="g-stage-card">
+                <p>Once terms are final, you pay <strong>Cedar &amp; Vine</strong> directly. Grace never handles your money.</p>
+                <p class="g-pay-slot">The final itemized agreement and payment contact will appear here &mdash; and by text.</p>
+              </div>
+            </div>
+          </li>
+        </ol>
+
+        <div class="g-dash-foot">
+          <p>Need something right now?</p>
+          <div class="g-mini-cta">
+            <button type="button" class="g-btn g-btn-fill" data-mode="call" aria-haspopup="dialog"><svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-call"/></svg> Call Grace</button>
+            <button type="button" class="g-btn g-btn-line" data-mode="text" aria-haspopup="dialog"><svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-text"/></svg> Text Grace</button>
+          </div>
+          <p class="g-dash-privacy">Opened from your private link. Text <strong>STOP</strong> anytime to end everything and erase your details.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="g-divider g-v-home" aria-hidden="true">
+    <svg width="72" height="16" viewBox="0 0 72 16" fill="none"><path d="M4 15V9a8 8 0 0 1 16 0v6" stroke="currentColor" stroke-width="1.5"/><path d="M28 15V9a8 8 0 0 1 16 0v6" stroke="currentColor" stroke-width="1.5"/><path d="M52 15V9a8 8 0 0 1 16 0v6" stroke="currentColor" stroke-width="1.5"/></svg>
+  </div>
+
+  <section class="g-section g-v-home" aria-labelledby="trust-h">
+    <div class="g-wrap">
+      <p class="g-overline">Boundaries</p>
+      <h2 id="trust-h">Where Grace draws the line</h2>
+      <p class="g-section-lede">Trust is built on limits. These are Grace’s.</p>
+      <ul class="g-nevers">
+        <li>
+          <h3>Never books or signs.</h3>
+          <p>Cremation, burial, embalming, transport — those decisions and signatures stay with your family.</p>
+        </li>
+        <li>
+          <h3>Never pushes on price.</h3>
+          <p>No budget demands, no manufactured urgency. Cheapest isn’t the same as most caring.</p>
+        </li>
+        <li>
+          <h3>Never sells your information.</h3>
+          <p>Providers can’t pay to be recommended, and nothing is shared without your say-so.</p>
+        </li>
+        <li>
+          <h3>Never guesses.</h3>
+          <p>If a fee is unconfirmed or an answer was vague, Grace tells you exactly that.</p>
+        </li>
+        <li>
+          <h3>Never replaces the people you need.</h3>
+          <p>Not a funeral director, lawyer, or counselor — when a question belongs with one, she says so.</p>
+        </li>
+      </ul>
+
+      <div class="g-faq">
+        <h3 id="faq-h">Questions families ask</h3>
+        <details>
+          <summary>What happens on the first call?</summary>
+          <p>A calm conversation, not a script. Grace asks what your family needs, repeats it back — and nothing is shared until you approve it.</p>
+        </details>
+        <details>
+          <summary>We’re on a deadline. Can Grace keep up?</summary>
+          <p>Yes — mention the deadline first. Grace prioritizes homes that can meet it, and is honest when a timeline looks tight.</p>
+        </details>
+        <details>
+          <summary>Do we have to talk about money?</summary>
+          <p>Only as much as you want. Grace gathers itemized prices for clarity — you’ll never be asked to name a budget.</p>
+        </details>
+        <details>
+          <summary>Who sees our information?</summary>
+          <p>Only the funeral homes you approve, only the details you’ve confirmed. Ask anytime what’s been shared, or reply STOP to any text to end contact.</p>
+        </details>
+        <details>
+          <summary>What does talking to Grace cost?</summary>
+          <p>Nothing. Funeral homes don’t pay Grace and she takes no commissions.</p>
+        </details>
+      </div>
+
+      <div class="g-end-cta">
+        <p>When you’re ready — or unsure where to begin — reach out.</p>
+        <div class="g-cta-row">
+          <button type="button" class="g-btn g-btn-fill" data-mode="call" aria-haspopup="dialog">
+            <svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-call"/></svg>
+            Call Grace
+          </button>
+          <button type="button" class="g-btn g-btn-line" data-mode="text" aria-haspopup="dialog">
+            <svg class="g-ico" width="20" height="20" aria-hidden="true"><use href="#i-text"/></svg>
+            Text Grace
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="g-site-foot" id="siteFoot">
+  <div class="g-wrap">
+    <span class="g-brand-name">Grace</span>
+    <p>Grace is an AI advocate for families arranging funeral services — not a funeral home, funeral director, law firm, or counseling service. She never authorizes cremation, burial, embalming, or transport of remains.</p>
+    <p>If a death was unexpected, your hospital, hospice team, or local authorities can guide the first step.</p>
+    <nav aria-label="Legal">
+      <button type="button" class="g-link-btn" data-route="progress">Your arrangements</button> · <span class="g-foot-dead">Privacy</span> · <span class="g-foot-dead">Consent &amp; data choices</span> · <span class="g-foot-dead">Contact</span>
+    </nav>
+    <p class="g-demo-note">Concept demo: the call and text requests on this page are simulated, no real calls are placed, and the arrangements view shows made-up sample details.</p>
+  </div>
+</footer>
+
+<!-- Visible system status once the sheet is closed -->
+<div class="g-statusbar" id="banner" hidden role="status">
+  <p id="bannerText"></p>
+  <button type="button" class="g-statusbar-cancel" id="bannerCancel">Cancel</button>
+  <button type="button" id="bannerClose" aria-label="Dismiss status">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
+<!-- Bottom navigation: two destinations, so nobody gets lost -->
+<nav class="g-bottomnav" id="bottomNav" aria-label="Primary">
+  <button type="button" class="g-bn-item" data-route="home" aria-current="page">
+    <span class="g-bn-pill" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.5 21V11.5a7.5 7.5 0 0 1 15 0V21" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="7" r="1" fill="currentColor"/></svg></span>
+    Home
+  </button>
+  <button type="button" class="g-bn-item" data-route="progress">
+    <span class="g-bn-pill" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="6.5" r="1.9" stroke="currentColor" stroke-width="1.9"/><path d="M11 6.5h8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="6" cy="12" r="1.9" stroke="currentColor" stroke-width="1.9"/><path d="M11 12h8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="6" cy="17.5" r="1.9" stroke="currentColor" stroke-width="1.9"/><path d="M11 17.5h5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+    Your arrangements
+  </button>
+</nav>
+
+<!-- ——— Contact sheet ——— -->
+<div class="g-sheet-root" id="sheetRoot" hidden>
+  <div class="g-backdrop" id="backdrop"></div>
+  <div class="g-sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="g-sheet-grip" aria-hidden="true"></div>
+    <button type="button" class="g-sheet-close" id="sheetClose" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <h2 id="sheetTitle" tabindex="-1">How should Grace reach you?</h2>
+
+    <!-- View: the tiny form -->
+    <div id="viewForm">
+      <fieldset class="g-seg">
+        <legend class="g-sr-only">How Grace makes contact</legend>
+        <input type="radio" name="mode" id="modeCall" value="call" checked aria-describedby="modeHint">
+        <label for="modeCall">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Call me now
+        </label>
+        <input type="radio" name="mode" id="modeText" value="text" aria-describedby="modeHint">
+        <label for="modeText">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Start by text
+        </label>
+      </fieldset>
+      <p class="g-mode-hint" id="modeHint">Grace calls within about a minute. Miss it and she’ll text instead. No rush.</p>
+
+      <label class="g-field-label" for="phone">Your phone number</label>
+      <input type="tel" id="phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="(555) 012-3456" aria-describedby="phoneHelp phoneErr">
+      <p class="g-field-help" id="phoneHelp">Mobile numbers work best for text.</p>
+      <p class="g-err" id="phoneErr" aria-live="assertive"></p>
+
+      <label class="g-consent" for="consent">
+        <input type="checkbox" id="consent" aria-describedby="consentErr">
+        <span>It’s OK for Grace to contact me at this number about funeral arrangements. One conversation, never marketing. Saying ‘stop’ ends it at any time.</span>
+      </label>
+      <p class="g-err" id="consentErr" aria-live="assertive"></p>
+
+      <div class="g-sheet-actions">
+        <button type="button" class="g-btn g-btn-fill" id="sendBtn"><span id="sendLabel">Call me now</span></button>
+        <button type="button" class="g-btn-quiet" id="cancelBtn">Cancel</button>
+      </div>
+      <p class="g-privacy-line">Your number is used only to reach you. Nothing is shared with any funeral home at this step.</p>
+    </div>
+
+    <!-- View: request status -->
+    <div id="viewStatus" class="g-status-view" hidden>
+      <div class="g-status-arch" id="statusArch">
+        <svg width="64" height="60" viewBox="0 0 64 60" fill="none" aria-hidden="true">
+          <path d="M8 60V30a24 24 0 0 1 48 0v30" stroke="#2E5546" stroke-width="2"/>
+          <path d="M18 60V33a14 14 0 0 1 28 0v27" stroke="#C7A45C" stroke-width="1.5"/>
+          <g id="statusIconCall">
+            <path d="M40 39.3v1.9a1.6 1.6 0 0 1-1.75 1.6 16 16 0 0 1-6.9-2.45 15.7 15.7 0 0 1-4.8-4.8 16 16 0 0 1-2.46-6.94A1.6 1.6 0 0 1 25.7 26.9h1.9a1.6 1.6 0 0 1 1.6 1.38c.1.77.29 1.52.56 2.25a1.6 1.6 0 0 1-.36 1.68l-1 1a12.8 12.8 0 0 0 4.8 4.8l1-1a1.6 1.6 0 0 1 1.69-.36c.72.27 1.48.46 2.24.56a1.6 1.6 0 0 1 1.38 1.62Z" stroke="#24222A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <g id="statusIconText" style="display:none">
+            <path d="M41 37.5a1.7 1.7 0 0 1-1.7 1.7h-10l-3.4 3.3V28.2a1.7 1.7 0 0 1 1.7-1.7h11.7a1.7 1.7 0 0 1 1.7 1.7Z" stroke="#24222A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+        </svg>
+      </div>
+      <p class="g-status-body" id="statusBody"></p>
+      <div class="g-status-actions" id="statusActions">
+        <button type="button" class="g-btn g-btn-fill" id="doneBtn">Done</button>
+        <button type="button" class="g-btn-quiet" id="editBtn">Wrong number? Edit it</button>
+        <button type="button" class="g-btn-quiet g-btn-danger-quiet" id="abortBtn">Cancel this request</button>
+      </div>
+    </div>
+
+    <!-- View: couldn’t start (plain-language error) -->
+    <div id="viewError" class="g-status-view" hidden>
+      <p class="g-status-body" id="errorBody"></p>
+      <div class="g-status-actions">
+        <button type="button" class="g-btn g-btn-fill" id="retryBtn">Try again</button>
+        <button type="button" class="g-btn-quiet" id="altBtn">Continue by text</button>
+      </div>
+    </div>
+
+    <!-- View: canceled -->
+    <div id="viewCanceled" class="g-status-view" hidden>
+      <p class="g-status-body">Nothing more will happen unless you reach out again.</p>
+      <div class="g-status-actions">
+        <button type="button" class="g-btn g-btn-fill" id="closeCanceled">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="g-sr-only" aria-live="polite" id="live"></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  var sheetRoot = $("sheetRoot"), sheet = $("sheet"), backdrop = $("backdrop");
+  var sheetTitle = $("sheetTitle"), sheetClose = $("sheetClose");
+  var viewForm = $("viewForm"), viewStatus = $("viewStatus"), viewError = $("viewError"), viewCanceled = $("viewCanceled");
+  var modeCall = $("modeCall"), modeText = $("modeText"), modeHint = $("modeHint");
+  var phone = $("phone"), phoneErr = $("phoneErr"), consent = $("consent"), consentErr = $("consentErr");
+  var sendBtn = $("sendBtn"), sendLabel = $("sendLabel"), cancelBtn = $("cancelBtn");
+  var statusBody = $("statusBody"), statusActions = $("statusActions"), statusArch = $("statusArch");
+  var iconCall = $("statusIconCall"), iconText = $("statusIconText");
+  var doneBtn = $("doneBtn"), editBtn = $("editBtn"), abortBtn = $("abortBtn");
+  var errorBody = $("errorBody"), retryBtn = $("retryBtn"), altBtn = $("altBtn");
+  var closeCanceled = $("closeCanceled");
+  var banner = $("banner"), bannerText = $("bannerText"), bannerCancel = $("bannerCancel"), bannerClose = $("bannerClose");
+  var live = $("live");
+
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var opener = null;          // element to return focus to
+  var active = null;          // { mode, num } for the in-flight request
+  var pendingTimer = null;
+  var bannerTimer = null;
+
+  var HINTS = {
+    call: "Grace calls within about a minute. Miss it and she\u2019ll text instead. No rush.",
+    text: "Grace sends the first message. Reply whenever suits you, tonight included."
+  };
+  var LABELS = { call: "Call me now", text: "Send the first text" };
+
+  function mode() { return modeText.checked ? "text" : "call"; }
+
+  function say(msg) {
+    live.textContent = "";
+    window.setTimeout(function () { live.textContent = msg; }, 60);
+  }
+
+  function syncMode() {
+    modeHint.textContent = HINTS[mode()];
+    sendLabel.textContent = LABELS[mode()];
+  }
+  modeCall.addEventListener("change", syncMode);
+  modeText.addEventListener("change", syncMode);
+
+  /* ——— validation: error prevention, plain language ——— */
+  function digitsOf(v) { return v.replace(/\D/g, ""); }
+  function validPhone(v) {
+    var d = digitsOf(v);
+    if (v.trim().charAt(0) === "+") { return d.length >= 8 && d.length <= 15; }
+    return d.length === 10 || (d.length === 11 && d.charAt(0) === "1");
+  }
+  function formatPhone(v) {
+    var d = digitsOf(v);
+    if (d.length === 11 && d.charAt(0) === "1") { d = d.slice(1); }
+    if (d.length === 10) { return "(" + d.slice(0, 3) + ") " + d.slice(3, 6) + "-" + d.slice(6); }
+    return v.trim();
+  }
+  function setErr(el, field, msg) {
+    el.textContent = msg;
+    if (field) { field.setAttribute("aria-invalid", "true"); }
+  }
+  function clearErrs() {
+    phoneErr.textContent = ""; consentErr.textContent = "";
+    phone.removeAttribute("aria-invalid"); consent.removeAttribute("aria-invalid");
+  }
+  phone.addEventListener("input", function () { phoneErr.textContent = ""; phone.removeAttribute("aria-invalid"); });
+  consent.addEventListener("change", function () { consentErr.textContent = ""; consent.removeAttribute("aria-invalid"); });
+  phone.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); sendBtn.click(); } });
+
+  /* ——— view switching inside the sheet ——— */
+  function setView(name, heading) {
+    viewForm.hidden = name !== "form";
+    viewStatus.hidden = name !== "status";
+    viewError.hidden = name !== "error";
+    viewCanceled.hidden = name !== "canceled";
+    sheetTitle.textContent = heading;
+    sheetTitle.focus({ preventScroll: true });
+  }
+
+  /* ——— open / close, focus management ——— */
+  function siblingsHidden(state) {
+    ["siteHead", "main", "siteFoot", "bottomNav", "banner"].forEach(function (id) {
+      var el = $(id);
+      if (!el) { return; }
+      if (state) { el.setAttribute("aria-hidden", "true"); }
+      else { el.removeAttribute("aria-hidden"); }
+    });
+  }
+
+  function openSheet(m) {
+    opener = document.activeElement;
+    if (m === "text") { modeText.checked = true; } else { modeCall.checked = true; }
+    syncMode();
+    clearErrs();
+    setViewSilently("form", "How should Grace reach you?");
+    sheetRoot.hidden = false;
+    siblingsHidden(true);
+    document.documentElement.style.overflow = "hidden";
+    window.requestAnimationFrame(function () { sheetRoot.classList.add("g-open"); });
+    window.setTimeout(function () { sheetTitle.focus(); }, reduced ? 0 : 80);
+  }
+  function setViewSilently(name, heading) {
+    viewForm.hidden = name !== "form";
+    viewStatus.hidden = name !== "status";
+    viewError.hidden = name !== "error";
+    viewCanceled.hidden = name !== "canceled";
+    sheetTitle.textContent = heading;
+  }
+
+  function closeSheet() {
+    sheetRoot.classList.remove("g-open");
+    var finish = function () {
+      sheetRoot.hidden = true;
+      siblingsHidden(false);
+      document.documentElement.style.overflow = "";
+      updateBanner();
+      if (opener && typeof opener.focus === "function") { opener.focus(); }
+    };
+    if (reduced) { finish(); } else { window.setTimeout(finish, 240); }
+  }
+
+  backdrop.addEventListener("click", closeSheet);
+  sheetClose.addEventListener("click", closeSheet);
+  cancelBtn.addEventListener("click", closeSheet);
+  doneBtn.addEventListener("click", closeSheet);
+  closeCanceled.addEventListener("click", closeSheet);
+
+  /* focus trap + Escape */
+  sheetRoot.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { e.preventDefault(); closeSheet(); return; }
+    if (e.key !== "Tab") { return; }
+    var nodes = sheet.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+    var focusables = [];
+    for (var i = 0; i < nodes.length; i++) {
+      if (!nodes[i].disabled && nodes[i].offsetParent !== null) { focusables.push(nodes[i]); }
+    }
+    if (!focusables.length) { return; }
+    var first = focusables[0], last = focusables[focusables.length - 1];
+    var current = document.activeElement;
+    if (e.shiftKey && (current === first || current === sheetTitle || current === sheet)) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && current === last) {
+      e.preventDefault(); first.focus();
+    }
+  });
+
+  /* ——— starting a request ——— */
+  sendBtn.addEventListener("click", function () {
+    clearErrs();
+    var ok = true;
+    if (!validPhone(phone.value)) {
+      setErr(phoneErr, phone, "That doesn\u2019t look like a complete number. Please double-check it so Grace reaches the right person.");
+      ok = false;
+    }
+    if (!consent.checked) {
+      setErr(consentErr, consent, "Please check the box above so Grace knows it\u2019s OK to get in touch.");
+      ok = false;
+    }
+    if (!ok) {
+      (phoneErr.textContent ? phone : consent).focus();
+      say(phoneErr.textContent || consentErr.textContent);
+      return;
+    }
+    startRequest();
+  });
+
+  function startRequest() {
+    var m = mode();
+    var num = formatPhone(phone.value);
+    active = { mode: m, num: num };
+    iconCall.style.display = m === "call" ? "" : "none";
+    iconText.style.display = m === "text" ? "" : "none";
+    statusArch.classList.remove("g-pulse");
+    statusActions.hidden = true;
+    statusBody.textContent = "One moment.";
+    setView("status", "Request received");
+    say("Request received");
+
+    /* ── Integration point ─────────────────────────────────────────
+       Replace this timeout with a POST to your contact endpoint,
+       e.g. fetch("/api/contact", {method:"POST", body:{num, mode:m}}).
+       On success call showActive(); on failure call showFailure(m). */
+    pendingTimer = window.setTimeout(function () {
+      if (!active) { return; }
+      if (window.GRACE_SIMULATE_FAILURE) { showFailure(m); return; }
+      showActive();
+    }, reduced ? 500 : 1400);
+  }
+
+  function showActive() {
+    if (!active) { return; }
+    if (active.mode === "call") {
+      sheetTitle.textContent = "Grace is calling you now";
+      statusBody.textContent = "Your phone should ring within a minute at " + active.num +
+        ". If you can\u2019t answer, Grace will text you instead so you can choose a better moment.";
+      statusArch.classList.add("g-pulse");
+    } else {
+      sheetTitle.textContent = "Message sent";
+      statusBody.textContent = "Check your messages: Grace has texted " + active.num +
+        ". Reply whenever you\u2019re ready \u2014 her first text includes a private link to your arrangements.";
+    }
+    statusActions.hidden = false;
+    sheetTitle.focus({ preventScroll: true });
+    say(sheetTitle.textContent);
+  }
+
+  /* Plain-language failure path. To preview it, set
+     window.GRACE_SIMULATE_FAILURE = true in the console,
+     or call showFailure(mode()) from your real request handler. */
+  function showFailure(m) {
+    window.clearTimeout(pendingTimer);
+    active = null;
+    if (m === "call") {
+      errorBody.textContent = "We couldn\u2019t start the call. Your information was not lost. Try again, or continue by text.";
+      altBtn.textContent = "Continue by text";
+    } else {
+      errorBody.textContent = "We couldn\u2019t send the text. Your information was not lost. Try again, or ask Grace to call instead.";
+      altBtn.textContent = "Ask Grace to call";
+    }
+    setView("error", "That didn\u2019t go through");
+    say(errorBody.textContent);
+  }
+  retryBtn.addEventListener("click", function () { startRequest(); });
+  altBtn.addEventListener("click", function () {
+    if (mode() === "call") { modeText.checked = true; } else { modeCall.checked = true; }
+    syncMode();
+    startRequest();
+  });
+
+  /* user control: edit the number, or cancel outright */
+  editBtn.addEventListener("click", function () {
+    window.clearTimeout(pendingTimer);
+    active = null;
+    setViewSilently("form", "How should Grace reach you?");
+    sheetTitle.textContent = "How should Grace reach you?";
+    phone.focus();
+    phone.select();
+    say("Update the number, then send again.");
+  });
+  abortBtn.addEventListener("click", function () {
+    window.clearTimeout(pendingTimer);
+    active = null;
+    setView("canceled", "Request canceled");
+    say("Request canceled. Nothing more will happen.");
+  });
+
+  /* ——— status banner: visible system status after closing ——— */
+  function updateBanner() {
+    window.clearTimeout(bannerTimer);
+    if (active) {
+      bannerCancel.hidden = false;
+      bannerText.textContent = active.mode === "call"
+        ? "Grace is calling " + active.num
+        : "Grace texted " + active.num + " \u00b7 waiting for your reply";
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+  }
+  bannerCancel.addEventListener("click", function () {
+    active = null;
+    bannerText.textContent = "Canceled. Nothing more will happen.";
+    bannerCancel.hidden = true;
+    say(bannerText.textContent);
+    bannerTimer = window.setTimeout(function () {
+      banner.hidden = true;
+      bannerCancel.hidden = false;
+    }, 4000);
+  });
+  bannerClose.addEventListener("click", function () { banner.hidden = true; });
+
+  /* ——— wire up every trigger ——— */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-mode]"), function (el) {
+    el.addEventListener("click", function () { openSheet(el.getAttribute("data-mode")); });
+  });
+
+  /* ——— Arrangements page ———
+     ── Integration point: in production, Grace texts a private link like
+     grace.example/d/<token>. Validate the token server-side, render the
+     family's live state in #dashLive (the sample markup mirrors the shape),
+     and open the page with #arrangements-live. The demo activates on that hash
+     or the preview button, using sample details. */
+  var dashEmpty = $("dashEmpty"), dashLive = $("dashLive"),
+      dashPreview = $("dashPreview"), dashHide = $("dashHide"),
+      dashHead = $("dashHead");
+
+  function showDash(on, focusTarget) {
+    if (!dashEmpty || !dashLive) { return; }
+    dashEmpty.hidden = on;
+    dashLive.hidden = !on;
+    if (on) {
+      dashHead.focus({ preventScroll: true });
+      say("Showing a sample of the live view.");
+    } else if (focusTarget) {
+      focusTarget.focus();
+      say("Sample hidden.");
+    }
+  }
+  if (dashPreview) { dashPreview.addEventListener("click", function () { showDash(true); }); }
+  if (dashHide) { dashHide.addEventListener("click", function () { showDash(false, dashPreview); }); }
+
+  /* ——— Two-view router: Home / Your arrangements ———
+     Clicks switch views directly (sandboxed hosts may block #-navigation,
+     so we never depend on it). The URL hash is kept in step when the host
+     allows, and #arrangements / #arrangements-live still work as entry
+     points — #arrangements-live being the private link Grace texts. */
+  var homeEls = document.querySelectorAll(".g-v-home");
+  var progressEl = $("progress");
+  var navLinks = document.querySelectorAll("[data-route]");
+  var heroH = $("hero-h"), progH = $("prog-h");
+  var current = "";
+
+  function go(r, opts) {
+    opts = opts || {};
+    if (opts.live && dashEmpty && dashLive) { dashEmpty.hidden = true; dashLive.hidden = false; }
+    Array.prototype.forEach.call(homeEls, function (el) { el.hidden = (r !== "home"); });
+    if (progressEl) { progressEl.hidden = (r !== "progress"); }
+    Array.prototype.forEach.call(navLinks, function (a) {
+      if (a.getAttribute("data-route") === r) { a.setAttribute("aria-current", "page"); }
+      else { a.removeAttribute("aria-current"); }
+    });
+    if (!opts.silent && r !== current) {
+      try { window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" }); } catch (e) {}
+      var target = (r === "progress") ? progH : heroH;
+      if (target) { target.focus({ preventScroll: true }); }
+      say(r === "progress" ? "Your arrangements" : "Home");
+    }
+    current = r;
+    if (!opts.keepHash) {
+      try { history.replaceState(null, "", r === "progress" ? "#arrangements" : "#home"); } catch (e) {}
+    }
+  }
+
+  Array.prototype.forEach.call(navLinks, function (a) {
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      go(a.getAttribute("data-route"));
+    });
+  });
+
+  function fromHash(silent) {
+    var h = window.location.hash;
+    if (h === "#arrangements") { go("progress", { silent: silent, keepHash: true }); }
+    else if (h === "#arrangements-live") { go("progress", { silent: silent, keepHash: true, live: true }); }
+    else if (h === "" || h === "#home" || h === "#main") { go("home", { silent: silent, keepHash: true }); }
+  }
+  var skipBtn = $("skipBtn");
+  if (skipBtn) {
+    skipBtn.addEventListener("click", function () {
+      var m = document.getElementById("main");
+      if (m) { m.focus({ preventScroll: false }); }
+    });
+  }
+
+  window.addEventListener("hashchange", function () { fromHash(false); });
+  fromHash(true);
+})();
+</script>
+</body>
+</html>
