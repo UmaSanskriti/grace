@@ -56,7 +56,12 @@ interface LaunchedCall { label: string; conversation_id: string; provider_id?: s
 // Polls /call-transcript for one conversation and renders the turns once the
 // call is done (or in progress). All calls are real; transcript shown for the
 // consented demo (INV-07). React escapes text on render — no injection.
-function CallTranscript({ call }: { call: LaunchedCall }) {
+function CallTranscript({ call, onTurns }: {
+  call: LaunchedCall;
+  // Reports turn count upward so the page can tell a call that is merely
+  // logged from one that is actually being transcribed.
+  onTurns?: (conversationId: string, turns: number) => void;
+}) {
   const [status, setStatus] = useState("pending");
   const [turns, setTurns] = useState<{ role: string; message: string }[]>([]);
   const [dur, setDur] = useState<number | null>(null);
@@ -70,12 +75,13 @@ function CallTranscript({ call }: { call: LaunchedCall }) {
         );
         if (!alive) return;
         setStatus(r.status); setTurns(r.transcript); setDur(r.duration_secs);
+        onTurns?.(call.conversation_id, r.transcript?.length ?? 0);
       } catch { /* keep polling */ }
     };
     tick();
     const t = setInterval(tick, 3000);
     return () => { alive = false; clearInterval(t); };
-  }, [call.conversation_id]);
+  }, [call.conversation_id, onTurns]);
 
   const done = status === "done" || status === "failed";
   const live = status === "in-progress" || status === "processing";
@@ -320,6 +326,15 @@ export default function AgentLoop() {
   const [err, setErr] = useState<string>("");
   const [aborting, setAborting] = useState(false);
 
+  // Conversations that have produced at least one turn. A call row can exist
+  // before ElevenLabs has any transcript for it, so "a call is logged" is not
+  // the same as "we are hearing it" — only the latter retires the waiting
+  // banner. Ids stay in the set so the banner cannot flicker back mid-call.
+  const [transcribing, setTranscribing] = useState<string[]>([]);
+  const noteTurns = useCallback((conversationId: string, turns: number) => {
+    setTranscribing((p) => (turns > 0 && !p.includes(conversationId) ? [...p, conversationId] : p));
+  }, []);
+
   // Case ids we have already seen, so a genuinely new one can be told apart
   // from the list simply reloading. Seeded on the first poll.
   const seenCases = useRef<Set<string> | null>(null);
@@ -351,6 +366,9 @@ export default function AgentLoop() {
     const t = setInterval(tick, 3000);
     return () => { alive = false; clearInterval(t); };
   }, []);
+
+  // A different case starts from "waiting" again.
+  useEffect(() => { setTranscribing([]); }, [caseId]);
 
   // Poll the selected case live.
   const poll = useCallback(() => {
@@ -482,13 +500,15 @@ export default function AgentLoop() {
 
       {/* The consumer dials Grace; the loop starts itself. Outbound "run it
           live" controls were removed — nothing here places a call. */}
-      <div className="flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50/50 px-4 py-3">
-        <PhoneCall className="h-4 w-4 shrink-0 text-teal-700" />
-        <span className="text-sm font-semibold text-teal-900">Waiting for the family to call Grace</span>
-        <span className="text-[11px] text-teal-800">
-          The case appears here once the intake call ends, then the loop runs itself.
-        </span>
-      </div>
+      {transcribing.length === 0 && (
+        <div className="flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50/50 px-4 py-3">
+          <PhoneCall className="h-4 w-4 shrink-0 text-teal-700" />
+          <span className="text-sm font-semibold text-teal-900">Waiting for the family to call Grace</span>
+          <span className="text-[11px] text-teal-800">
+            The case appears here once the intake call ends, then the loop runs itself.
+          </span>
+        </div>
+      )}
 
       {err && !view && (
         <div className="rounded-lg border border-grace-dangerSoft bg-grace-dangerSoft p-3 text-sm text-grace-danger">
@@ -547,7 +567,9 @@ export default function AgentLoop() {
             <div className="space-y-3">
               <div className="text-sm font-bold" style={{ color: "#12213f" }}>Call transcripts</div>
               <div className="grid gap-3 lg:grid-cols-2">
-                {transcriptCalls.map((c) => <CallTranscript key={c.conversation_id} call={c} />)}
+                {transcriptCalls.map((c) => (
+                  <CallTranscript key={c.conversation_id} call={c} onTurns={noteTurns} />
+                ))}
               </div>
             </div>
           )}
