@@ -1,12 +1,12 @@
 // =====================================================================
 // Grace Edge Function — POST /twilio/sms  (spec §4.2 routing, App B.2, §6.3)
-// Verify Twilio signature, route SMS keywords (TEXT/CALL/STOP/HELP/YES/EDIT/
-// SUMMARY) or run a one-question intake text turn.
+// Verify Twilio signature, route SMS keywords (TEXT/CALL/STOP/HELP/YES/EDIT)
+// or run a one-question intake text turn.
 // Enforces: signature verify (§6.7), INV-10 (STOP blocks later outbound),
 // INV-01/02 (no call without voice consent + allowlist), idempotency by
 // MessageSid (§7 idempotency keys).
 // State touches: PREFERENCE_SMS_SENT->TEXT_INTAKE, ->INTAKE_AGENT_ACTIVE (CALL),
-// CASE_DRAFT->CASE_CONFIRMED (YES), REPORT_READY->CONSUMER_TEXT_SUMMARY (SUMMARY).
+// CASE_DRAFT->CASE_CONFIRMED (YES). CALL at REPORT_READY -> Closer consumer call.
 // =====================================================================
 import { corsHeaders } from "../_shared/cors.ts";
 import { error } from "../_shared/respond.ts";
@@ -17,7 +17,7 @@ import { assertAllowedNumber } from "../_shared/allowlist.ts";
 import { hashPhone } from "../_shared/crypto.ts";
 import { graceTextTurn } from "../_shared/openai/functions.ts";
 import { appBaseUrl, supabaseServiceRoleKey } from "../_shared/env.ts";
-import type { CaseSpec, CaseStatus, RankedReport } from "../_shared/types.ts";
+import type { CaseSpec, CaseStatus } from "../_shared/types.ts";
 import disclosure from "../_shared/config/disclosure.json" with { type: "json" };
 import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
@@ -167,10 +167,13 @@ Deno.serve(async (req: Request) => {
       return reply(supa, caseId, "This number is not enabled for calls in the demo.");
     }
     await supa.from("cases").update({ preferred_channel: "voice" }).eq("case_id", caseId);
-    // Launch intake by calling our own /calls/intake. `to` is the inbound sender
-    // (Twilio provides the E.164 in plaintext) so we never need to decrypt at rest.
+    // When the ranked report is ready, CALL means "explain my results" -> launch
+    // the Grace Closer consumer-explanation call. Otherwise it starts intake.
+    // `to` is the inbound sender (Twilio gives the E.164 in plaintext) so we
+    // never decrypt at rest.
+    const callEndpoint = caseRow.status === "REPORT_READY" ? "/calls-closer-consumer" : "/calls-intake";
     try {
-      await invoke("/calls-intake", { case_id: caseId, to: from });
+      await invoke(callEndpoint, { case_id: caseId, to: from });
     } catch {
       return reply(supa, caseId, "I hit a problem starting the call. Reply CALL to retry or TEXT to continue by text.");
     }
@@ -204,33 +207,6 @@ Deno.serve(async (req: Request) => {
     // EDIT -> reopen intake for patching.
     await transition(supa, caseId, "TEXT_INTAKE", "case.edit_requested");
     return reply(supa, caseId, "Sure — what would you like to change?");
-  }
-
-  // SUMMARY -> only when a ranked report is ready.
-  if (keyword === "SUMMARY" && caseRow.status === "REPORT_READY") {
-    const { data: reportRow } = await supa
-      .from("reports")
-      .select("report_json")
-      .eq("case_id", caseId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const report = reportRow?.report_json as RankedReport | undefined;
-    let summary: string;
-    if (!report) {
-      summary = "Your ranked results aren't ready yet. I'll text you the moment they are.";
-    } else if (report.is_tie) {
-      summary = disclosure.messages.consumer_updates.tie;
-    } else {
-      const top = report.scores?.find((s) => s.provider_id === report.recommended_provider_id);
-      const total = top?.comparable_total != null ? `~$${top.comparable_total}` : "an itemized total";
-      summary =
-        `Recommended: ${report.recommended_provider_id} at ${total} comparable. ` +
-        (report.material_tradeoff ? `Trade-off: ${report.material_tradeoff}. ` : "") +
-        `Reply CALL to talk it through with the Grace Closer Agent.`;
-    }
-    await transition(supa, caseId, "CONSUMER_TEXT_SUMMARY", "consumer.summary_sent");
-    return reply(supa, caseId, summary.slice(0, 320));
   }
 
   // ---- Default: one structured intake text turn (§3.4: one OpenAI call, no web search) ----

@@ -21,7 +21,7 @@
       "after_call_launch": "I've started three provider calls. I'll text when I have comparable results.",
       "callback_or_failure": "One provider requested a callback; two quotes are complete. I'm continuing.",
       "quotes_audited": "I have three outcomes. One low quote omitted fees; I asked for clarification.",
-      "report_ready": "I've ranked the options. Reply SUMMARY for text or CALL to speak with the Grace Closer Agent.",
+      "report_ready": "I've compared the providers and have your ranked results. Reply CALL to have the Grace Closer Agent walk you through them.",
       "tie": "Two providers are effectively tied. The Grace Closer Agent can explain the price/fit trade-off without forcing one choice."
     }
   },
@@ -31,7 +31,7 @@
     "closer_provider": "Hello, I'm Grace, an AI assistant representing a family, following up on your funeral pricing quote. This is a synthetic hackathon demo and the call is transcribed. Do you consent to continue?",
     "closer_consumer": "This is the Grace Closer Agent. I have your ranked provider results. May I walk you through them?"
   },
-  "sms_keywords": ["TEXT", "CALL", "STOP", "HELP", "YES", "EDIT", "SUMMARY"],
+  "sms_keywords": ["TEXT", "CALL", "STOP", "HELP", "YES", "EDIT"],
   "operational_replies": {
     "consent_declined_provider": "Understood, I won't record. Thank you for your time. Goodbye.",
     "robot_question": "Yes, I'm an AI assistant calling on behalf of a family for this synthetic demo. May I continue with the pricing questions?",
