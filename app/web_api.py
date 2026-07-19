@@ -111,7 +111,9 @@ def _build_nodes(case: dict) -> list[dict]:
             state_for(prog >= 9, status == "calling_for_quotes"),
             "Calling providers for quotes" if status == "calling_for_quotes"
             else ("Quote calls complete" if quotes else "Waiting on the brief"),
-            f"{len(reached)}/{len(quotes)} reached" if quotes else "—",
+            # Against the provider total, not quotes-recorded-so-far: mid-run the
+            # latter reads "0/1 reached" when only one call has come back yet.
+            f"{len(reached)}/{len(home_list) or len(quotes)} reached" if quotes else "—",
         ),
         _node(
             "normalizer", "Normalizer", "tool",

@@ -366,19 +366,20 @@ export default function AgentLoop() {
     return () => clearInterval(t);
   }, [poll]);
 
-  // Kill switch. Stops the NEXT call — a call already ringing still completes
-  // and still lands its transcript.
-  const abortCase = useCallback(async () => {
+  // Kill switch, and the way back out of it. Stop halts the NEXT call — one
+  // already ringing still completes and still lands its transcript. Resume only
+  // clears the flag; it does not restart the pipeline (POST /advance does).
+  const toggleAbort = useCallback(async (action: "abort" | "resume") => {
     if (!caseId) return;
     setAborting(true);
     try {
-      const res = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/abort`, {
+      const res = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/${action}`, {
         method: "POST", headers: authHeaders,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       poll();
     } catch (e) {
-      setErr(`Abort failed: ${e instanceof Error ? e.message : String(e)}`);
+      setErr(`${action} failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setAborting(false);
     }
@@ -463,12 +464,18 @@ export default function AgentLoop() {
             live · polling 1.6s
           </span>
           <button
-            onClick={abortCase}
-            disabled={!caseId || aborting || Boolean(view?.case.aborted)}
-            title="Stop this case placing any further calls. A call already ringing still finishes."
-            className="rounded-md border border-grace-danger bg-grace-dangerSoft px-3 py-1.5 text-sm font-semibold text-grace-danger hover:brightness-95 disabled:opacity-40"
+            onClick={() => toggleAbort(view?.case.aborted ? "resume" : "abort")}
+            disabled={!caseId || aborting}
+            title={view?.case.aborted
+              ? "Clear the stop flag so this case can place calls again (does not restart the pipeline)."
+              : "Stop this case placing any further calls. A call already ringing still finishes."}
+            className={`rounded-md border px-3 py-1.5 text-sm font-semibold hover:brightness-95 disabled:opacity-40 ${
+              view?.case.aborted
+                ? "border-grace-accent bg-grace-accentSoft text-grace-accent"
+                : "border-grace-danger bg-grace-dangerSoft text-grace-danger"
+            }`}
           >
-            {view?.case.aborted ? "Stopped" : aborting ? "Stopping…" : "⛔ Stop agents"}
+            {aborting ? "…" : view?.case.aborted ? "▶ Resume" : "⛔ Stop agents"}
           </button>
         </div>
       </div>
