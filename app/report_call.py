@@ -39,12 +39,16 @@ def _homes_called(case_id: str) -> int:
     """Count only quote records that represent an actual dial attempt.
 
     `quotes/*.json` also holds `_mark_unreachable` records (calls.py) for homes
-    that were never dialed at all — no phone number on file, or skipped as a
-    non-DEMO_TARGET in DEMO_MODE — so counting every file overstates how many
-    homes were really called. `call_id` is the exact discriminator: it is
-    always None on a `_mark_unreachable` record and always set on a real quote
-    (calls.py), so it distinguishes "we dialed and got X" from "we never
-    picked up the phone."
+    that were never dialed at all — no phone number on file, skipped as a
+    non-DEMO_TARGET in DEMO_MODE, or ElevenLabs rejected the outbound request
+    before anything rang — so counting every file overstates how many homes
+    were really called. `call_id` is the discriminator, but it is not a
+    "quote vs. unreachable" split: `_mark_unreachable` itself carries a
+    `call_id` when the home *was* actually dialed and just didn't yield a
+    quote (no answer / empty transcript, or extraction failed on a real
+    transcript) — only the never-dialed cases leave it None. So `call_id`
+    truthy means "the phone actually rang for this home," which is exactly
+    what this count needs, regardless of whether a quote came out of it.
     """
     qdir = storage.case_dir(case_id) / "quotes"
     if not qdir.exists():
@@ -115,20 +119,31 @@ def _fallback_summary(case_id: str) -> str:
 
 
 def _recommendation_constraint(case_id: str) -> str:
-    """The one recommendation the spoken summary is bound to.
+    """The one recommendation, and the one dial count, the spoken summary is bound to.
 
     _best_home is the gated, evidenced truth (unagreed negotiations excluded);
     report.md (app/report.py) applies no such filter and its LLM may recommend
     on value rather than price. Handing this to the summarizer as an explicit
     constraint keeps report_summary from naming a different home or price than
     recommended_home/final_price state on the same call.
+
+    _homes_called gets the same treatment for the same reason: report.py's
+    quotes/*.json gathers one record per home regardless of whether it was
+    ever dialed (report.md tells the LLM to note unreachable homes rather than
+    omit them), so a report_summary built only from the report body could read
+    the row count off the table and state how many homes "were called" when
+    some were only ever marked unreachable. Binding the count here keeps that
+    figure tied to the same gated data as the recommendation, on the same call.
     """
     name, price = _best_home(case_id)
+    count = _homes_called(case_id)
     return (
-        "AUTHORITATIVE CONSTRAINT — this governs if the report body conflicts with it: "
-        f"the recommended funeral home is {name or NO_RECOMMENDATION} and the confirmed "
-        f"final price is {_money(price) or NO_PRICE}. Do not name any other home as the "
-        "recommendation, and do not state any other figure as the confirmed price."
+        "AUTHORITATIVE CONSTRAINT — this governs over the report body wherever the two "
+        f"conflict: the recommended funeral home is {name or NO_RECOMMENDATION}, the "
+        f"confirmed final price is {_money(price) or NO_PRICE}, and the number of funeral "
+        f"homes actually called (dialed, whether or not they answered) is {count}. Do not "
+        "name any other home as the recommendation, do not state any other figure as the "
+        "confirmed price, and do not state any other number of homes called."
     )
 
 

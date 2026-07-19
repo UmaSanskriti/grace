@@ -33,7 +33,17 @@ def _home_by_id(homes: list[dict], fh_id: str) -> dict | None:
     return next((h for h in homes if h.get("id") == fh_id), None)
 
 
-def _mark_unreachable(case_id: str, home: dict, reason: str) -> None:
+def _mark_unreachable(
+    case_id: str, home: dict, reason: str, call_id: str | None = None
+) -> None:
+    """Record a home as unreachable — no quote, but not necessarily never dialed.
+
+    `call_id` distinguishes the two ways a home ends up here: pass the
+    conversation id when the call was actually placed (no answer, or a
+    transcript extraction failure) and leave it None when the home was never
+    dialed at all (no phone on file, skipped as a non-DEMO_TARGET, or
+    ElevenLabs rejected the outbound request before anything rang).
+    """
     fh_id = home.get("id", "unknown")
     storage.save_json(
         case_id,
@@ -41,7 +51,7 @@ def _mark_unreachable(case_id: str, home: dict, reason: str) -> None:
         {
             "funeral_home_id": fh_id,
             "funeral_home_name": home.get("name", ""),
-            "call_id": None,
+            "call_id": call_id,
             "reached": False,
             "quoted_price_usd": None,
             "status": "unreachable",
@@ -149,12 +159,21 @@ def handle_quote_result(case_id: str, fh_id: str | None, conversation_id: str, t
         homes = storage.read_json(case_id, "funeral_homes.json") or []
         home = _home_by_id(homes, fh_id) or {"id": fh_id, "name": ""}
         if not transcript.strip():
-            _mark_unreachable(case_id, home, "empty transcript / no answer")
+            # The call was actually placed (a conversation_id exists) — just
+            # nobody picked up, or the transcript came back empty. Distinct
+            # from "never dialed": carry the call id so _homes_called counts
+            # this as a real dial attempt.
+            _mark_unreachable(
+                case_id, home, "empty transcript / no answer", call_id=conversation_id
+            )
         else:
             try:
                 quote = extract_quote(transcript)
             except Exception as e:  # LLM / validation failure
-                _mark_unreachable(case_id, home, f"extraction failed: {e}")
+                # Also an actual dial — extraction failed on a real transcript.
+                _mark_unreachable(
+                    case_id, home, f"extraction failed: {e}", call_id=conversation_id
+                )
             else:
                 record = {
                     "funeral_home_id": fh_id,

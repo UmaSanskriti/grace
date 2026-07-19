@@ -9,13 +9,17 @@ Invariants under test:
   2. The fallback names the cheapest home with a confirmed number.
   3. `_best_home` ignores unreached homes, ignores unagreed negotiations, and
      prefers the negotiated price over the home's own quote.
-  3b. The LLM summarization call is bound to that same gated recommendation
-     via an explicit constraint, so report_summary cannot name a different
-     home/price than recommended_home/final_price on the same call — even
-     though report.md itself applies no such gate.
+  3b. The LLM summarization call is bound to that same gated recommendation,
+     and to the gated dial count, via an explicit constraint, so
+     report_summary cannot name a different home/price/count than
+     recommended_home/final_price/_homes_called on the same call — even
+     though report.md itself applies no such gate and its row count may
+     include homes that were never actually dialed.
   4. `_homes_called` counts only quote records with a real dial attempt
      (`call_id` set) — never homes that were skipped without ever being
-     called (no phone number, or not a DEMO_TARGET in DEMO_MODE).
+     called (no phone number, or not a DEMO_TARGET in DEMO_MODE) — but DOES
+     count a home that was dialed and got no answer / a failed extraction
+     (calls.py's `_mark_unreachable(..., call_id=conversation_id)`).
   5. Every guard (missing agent id, missing phone, non-demo number in
      DEMO_MODE, an aborted case) writes `report_call.json` before returning.
   6. Nothing — ElevenLabs errors, unexpected exceptions, a dead LLM, a
@@ -118,14 +122,93 @@ def test_summary() -> None:
               f"DEMO-skipped record inflated homes_called: "
               f"{report_call._homes_called(case_id)}")
 
+        # A home that WAS actually dialed but never yielded a quote — no
+        # answer, empty transcript — is the shape calls.py's
+        # handle_quote_result now writes via _mark_unreachable(...,
+        # call_id=conversation_id). It must count as a dial even though it
+        # is also `status: unreachable`, since the phone really rang.
+        storage._write_json(d / "quotes" / "fh_005.json", {
+            "funeral_home_id": "fh_005", "funeral_home_name": "No Answer",
+            "call_id": "conv_fh005", "reached": False, "quoted_price_usd": None,
+            "status": "unreachable", "notes": "empty transcript / no answer",
+        })
+        check(report_call._homes_called(case_id) == 3,
+              f"dialed-but-no-answer record did not count as a dial: "
+              f"{report_call._homes_called(case_id)}")
+
         summary, source = report_call.summarize_for_speech(case_id, "# report")
 
     check(source == "fallback", f"LLM raised but source is {source!r}")
     check(summary.strip() != "", "fallback summary is empty — the agent would have a blank to fill")
     check("Oak Hill" in summary, f"fallback omits the recommended home: {summary!r}")
     check("$3,650" in summary, f"fallback omits the final price: {summary!r}")
-    check("We called 2 funeral homes" in summary,
+    check("We called 3 funeral homes" in summary,
           f"fallback omits the number of actually-dialed homes: {summary!r}")
+
+
+def test_calls_pipeline_records_call_id_for_dialed_no_quote() -> None:
+    """Exercises app.calls.handle_quote_result directly: both routes that mark
+    a home unreachable after it WAS actually dialed — empty transcript / no
+    answer, and extraction failure on a real transcript — must carry the
+    call's conversation_id, so _homes_called (which reads exactly this file
+    shape) does not undercount real dials as never-called.
+
+    This is the real code path behind the hand-authored fixtures in
+    test_summary; a regression in calls.py's _mark_unreachable call sites
+    would be caught here even if those fixtures still matched by hand.
+    `ElevenLabsError` ("call failed") is deliberately NOT covered here — that
+    site never dials at all, so it correctly writes no call_id.
+    """
+    from app import calls
+
+    real_demo_mode = settings.demo_mode
+    real_auto_advance = settings.auto_advance
+    real_extract_quote = calls.extract_quote
+    settings.demo_mode = False
+    settings.auto_advance = False  # keep this test off the network
+    try:
+        # Empty transcript / no answer.
+        with tempfile.TemporaryDirectory() as td:
+            storage.DATA_DIR = Path(td)
+            storage.INDEX_PATH = Path(td) / "_index.json"
+            case_id = "case_test_002"
+            d = Path(td) / case_id
+            storage._write_json(d / "case.json", {"case_id": case_id, "status": "calling_for_quotes"})
+            storage._write_json(d / "funeral_homes.json", [
+                {"id": "fh_x", "name": "No Answer Home", "phone": "+15551234567"},
+            ])
+            storage._write_json(d / "user_info.json", {})
+            calls.handle_quote_result(case_id, "fh_x", "conv_no_answer", "")
+            saved = storage.read_json(case_id, "quotes/fh_x.json")
+        check(saved is not None, "no quote record written for fh_x (empty transcript case)")
+        check((saved or {}).get("call_id") == "conv_no_answer",
+              f"empty-transcript record lost its call_id: {saved!r}")
+        check((saved or {}).get("status") == "unreachable",
+              f"expected status unreachable: {saved!r}")
+
+        # Extraction failure on a real (non-empty) transcript.
+        calls.extract_quote = lambda transcript: (_ for _ in ()).throw(RuntimeError("boom"))
+        with tempfile.TemporaryDirectory() as td:
+            storage.DATA_DIR = Path(td)
+            storage.INDEX_PATH = Path(td) / "_index.json"
+            case_id = "case_test_003"
+            d = Path(td) / case_id
+            storage._write_json(d / "case.json", {"case_id": case_id, "status": "calling_for_quotes"})
+            storage._write_json(d / "funeral_homes.json", [
+                {"id": "fh_y", "name": "Bad Transcript Home", "phone": "+15557654321"},
+            ])
+            storage._write_json(d / "user_info.json", {})
+            calls.handle_quote_result(
+                case_id, "fh_y", "conv_bad_extract", "hello this is a real transcript",
+            )
+            saved2 = storage.read_json(case_id, "quotes/fh_y.json")
+        check(saved2 is not None, "no quote record written for fh_y (extraction failure case)")
+        check((saved2 or {}).get("call_id") == "conv_bad_extract",
+              f"extraction-failure record lost its call_id: {saved2!r}")
+    finally:
+        settings.demo_mode = real_demo_mode
+        settings.auto_advance = real_auto_advance
+        calls.extract_quote = real_extract_quote
 
 
 class _CapturingOpenAI:
@@ -165,16 +248,28 @@ def test_llm_summary_bound_to_best_home() -> None:
     naming a different home and price on the same call. This is the same
     class of defect as the confidential-figure leak in _competing_disclosure
     (calls.py): an assertive sentence that isn't tied to evidence.
+
+    The dial count gets the same binding, for the same reason: report.py
+    gathers one quotes/*.json row per home regardless of whether it was ever
+    dialed (report.md says to note unreachable homes rather than omit them),
+    so a report body's row count can overstate how many homes were actually
+    called. The seeded case has 3 quote records but only 2 with a real dial
+    (call_id set) — see _seed — so a report body claiming a different count
+    proves the constraint, not the report body, governs what gets spoken.
     """
     real_openai = report_call.OpenAI
     report_call.OpenAI = _CapturingOpenAI
     try:
         with tempfile.TemporaryDirectory() as td:
             case_id = _seed(Path(td))
-            # A report body that recommends a different home/price than
-            # _best_home would ever allow, so a passing test actually proves
-            # the constraint governs rather than merely being vacuously true.
-            conflicting_md = "# Report\n\nWe recommend Riverside at $9,999.\n"
+            # A report body that recommends a different home/price/count than
+            # the gated truth would ever allow, so a passing test actually
+            # proves the constraint governs rather than merely being
+            # vacuously true.
+            conflicting_md = (
+                "# Report\n\nWe recommend Riverside at $9,999. "
+                "We called 5 funeral homes to get you these quotes.\n"
+            )
             summary, source = report_call.summarize_for_speech(case_id, conflicting_md)
     finally:
         report_call.OpenAI = real_openai
@@ -189,6 +284,9 @@ def test_llm_summary_bound_to_best_home() -> None:
           f"constraint omits the gated recommendation (Oak Hill): {user_msg!r}")
     check("$3,650" in user_msg,
           f"constraint omits the gated final price ($3,650): {user_msg!r}")
+    check("homes actually called" in user_msg and " is 2" in user_msg,
+          f"constraint omits the gated dial count (2), leaving the LLM path free "
+          f"to read the report body's 5-home count instead: {user_msg!r}")
 
 
 def test_unagreed_negotiation_ignored() -> None:
@@ -553,6 +651,7 @@ def test_pipeline_places_report_call() -> None:
 def main() -> int:
     report_call.OpenAI = _BoomOpenAI
     test_summary()
+    test_calls_pipeline_records_call_id_for_dialed_no_quote()
     test_llm_summary_bound_to_best_home()
     test_unagreed_negotiation_ignored()
     test_corrupt_quote_file_never_raises()
