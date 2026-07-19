@@ -1,0 +1,19 @@
+[project]
+name = "grace"
+version = "0.1.0"
+description = "Grace — AI funeral quote & negotiation agent (orchestrator)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    # Used by Slice 2+ (extraction / research). Installed now so the pipeline
+    # modules can be filled in without a dependency change.
+    "openai>=1.40",
+    "tavily-python>=0.5",
+]
+
+[tool.uv]
+package = false
