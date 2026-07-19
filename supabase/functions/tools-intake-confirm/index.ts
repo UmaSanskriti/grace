@@ -14,7 +14,7 @@ import { supabaseAdmin } from "../_shared/supabase.ts";
 import { json, error } from "../_shared/respond.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import type { CaseSpec } from "../_shared/types.ts";
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 /** Recursively sort object keys so equal specs hash identically (INV-03). */
 function canonicalize(v: unknown): unknown {

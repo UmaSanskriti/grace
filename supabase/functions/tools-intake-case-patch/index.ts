@@ -15,7 +15,7 @@ import { json, error } from "../_shared/respond.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import type { CasePatch, CaseSpec } from "../_shared/types.ts";
 // Config is the source of truth for jurisdiction defaults + disallowed facts.
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 /** Deterministic default draft spec for a brand-new case (all permissions false). */
 function baseSpec(caseId: string, version: number): Record<string, unknown> {

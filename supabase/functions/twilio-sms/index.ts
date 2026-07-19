@@ -18,8 +18,8 @@ import { hashPhone } from "../_shared/crypto.ts";
 import { graceTextTurn } from "../_shared/openai/functions.ts";
 import { appBaseUrl, supabaseServiceRoleKey } from "../_shared/env.ts";
 import type { CaseSpec, CaseStatus, RankedReport } from "../_shared/types.ts";
-import disclosure from "../../../config/disclosure.json" with { type: "json" };
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import disclosure from "../_shared/config/disclosure.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;
@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
     // Launch intake by calling our own /calls/intake. `to` is the inbound sender
     // (Twilio provides the E.164 in plaintext) so we never need to decrypt at rest.
     try {
-      await invoke("/calls/intake", { case_id: caseId, to: from });
+      await invoke("/calls-intake", { case_id: caseId, to: from });
     } catch {
       return reply(supa, caseId, "I hit a problem starting the call. Reply CALL to retry or TEXT to continue by text.");
     }
@@ -193,9 +193,9 @@ Deno.serve(async (req: Request) => {
       // then launch the provider caller batch. Passing consumer_to lets
       // /calls/callers send the consumer update SMS without decrypting at rest.
       try {
-        await invoke("/tools/intake/confirm", { case_id: caseId });
+        await invoke("/tools-intake-confirm", { case_id: caseId });
         await transition(supa, caseId, "CASE_CONFIRMED", "case.confirmed");
-        await invoke("/calls/callers", { case_id: caseId, consumer_to: from });
+        await invoke("/calls-callers", { case_id: caseId, consumer_to: from });
       } catch {
         return reply(supa, caseId, "I couldn't start the provider calls just now. Please reply YES to retry.");
       }
@@ -252,7 +252,7 @@ Deno.serve(async (req: Request) => {
   // INV-04: mention_budget is never inferred here; graceTextTurn/the tool enforce it.
   if (result.case_patch) {
     try {
-      await invoke("/tools/intake/case-patch", { case_id: caseId, patch: result.case_patch });
+      await invoke("/tools-intake-case-patch", { case_id: caseId, patch: result.case_patch });
     } catch {
       // Non-fatal for the reply; the patch tool logs its own failure.
     }

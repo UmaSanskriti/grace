@@ -22,7 +22,7 @@ import type {
   ProviderScore,
   VerifiedLeverage,
 } from "../_shared/types.ts";
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;

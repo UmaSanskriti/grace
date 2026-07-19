@@ -15,7 +15,7 @@ import { sanitizeTranscript } from "../_shared/ledger/ledger.ts";
 import { json, error } from "../_shared/respond.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import type { CaseSpec, QuoteResult, RankedReport } from "../_shared/types.ts";
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 function extractCaseId(url: URL): string | null {
   const parts = url.pathname.split("/").filter(Boolean);

@@ -1,0 +1,40 @@
+{
+  "$schema_version": "grace-demo-v1",
+  "disclosure_version": "grace-demo-2026-07-18",
+  "consent_fields": {
+    "scope": "demo_sms_and_ai_voice",
+    "sms_opt_in": true,
+    "ai_voice_opt_in": true,
+    "transcription_opt_in": true,
+    "marketing_opt_in": false,
+    "revocation": "STOP by SMS or cancel in Lovable"
+  },
+  "consent_record_stores": ["timestamp", "disclosure_version", "phone_hash", "ip", "user_agent"],
+  "messages": {
+    "first_sms": "Grace here, the AI funeral-arrangements advocate for this demo. Would you rather continue by text or receive a call? Reply TEXT or CALL. Messages and calls may be transcribed and processed by our service providers. Reply STOP to stop.",
+    "calling_now_ack": "Calling now.",
+    "stop_confirmation": "You're unsubscribed. Grace will not contact you again. Reply HELP for info.",
+    "help": "Grace is an AI funeral-arrangements advocate for a controlled hackathon demo using synthetic data. Messages/calls may be transcribed and processed by Twilio, ElevenLabs, and OpenAI. Reply STOP to stop, TEXT to continue by text, or CALL for a voice call.",
+    "reask_channel": "Would you prefer TEXT or CALL?",
+    "confirmation_gate": "I'll compare cremation with a private family goodbye, Spanish-language support, hospital pickup near 94304, and a memorial later. I will not share a budget. You've allowed me to use a verified competing quote to seek better non-binding terms, but I cannot book or authorize anything. Reply YES or EDIT.",
+    "consumer_updates": {
+      "after_call_launch": "I've started three provider calls. I'll text when I have comparable results.",
+      "callback_or_failure": "One provider requested a callback; two quotes are complete. I'm continuing.",
+      "quotes_audited": "I have three outcomes. One low quote omitted fees; I asked for clarification.",
+      "report_ready": "I've ranked the options. Reply SUMMARY for text or CALL to speak with the Grace Closer Agent.",
+      "tie": "Two providers are effectively tied. The Grace Closer Agent can explain the price/fit trade-off without forcing one choice."
+    }
+  },
+  "voice_openings": {
+    "intake": "This is Grace, an AI assistant for a synthetic funeral-arrangements demo. This call is transcribed and processed by our service providers. May I continue and record this conversation for the demo?",
+    "caller": "Hello, I'm Grace, an AI assistant calling on behalf of a family to request and compare funeral pricing. This is a controlled hackathon demo using synthetic case details. The call will be transcribed for the demo. Do you consent to continue and be transcribed?",
+    "closer_provider": "Hello, I'm Grace, an AI assistant representing a family, following up on your funeral pricing quote. This is a synthetic hackathon demo and the call is transcribed. Do you consent to continue?",
+    "closer_consumer": "This is the Grace Closer Agent. I have your ranked provider results. May I walk you through them?"
+  },
+  "sms_keywords": ["TEXT", "CALL", "STOP", "HELP", "YES", "EDIT", "SUMMARY"],
+  "operational_replies": {
+    "consent_declined_provider": "Understood, I won't record. Thank you for your time. Goodbye.",
+    "robot_question": "Yes, I'm an AI assistant calling on behalf of a family for this synthetic demo. May I continue with the pricing questions?",
+    "payment_pressure": "I can't make payments or commit on the family's behalf. Could you send a written quote instead? Thank you."
+  }
+}

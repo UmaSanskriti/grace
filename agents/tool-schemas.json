@@ -5,7 +5,7 @@
   "conventions": {
     "base_url": "{{APP_BASE_URL}} resolves to the deployed Supabase Edge Functions origin.",
     "auth": "Each webhook verifies the ElevenLabs HMAC (verifyElevenLabsHmac) and is idempotent (ensureIdempotent).",
-    "endpoint_map_source": "§6.3 / CONTRACTS.md. Paths marked \"map\": \"exact\" appear verbatim in the CONTRACTS.md endpoint map; paths marked \"map\": \"convention\" follow the tools-<agent>-<verb> naming convention for tools that share a directory but were not spelled out individually in the map (get_provider_task, get_verified_leverage, save_consumer_decision, log_intake_event). mark_callback_or_decline and finalize_call_outcome both POST to /tools/caller/finalize; the server branches on `outcome`.",
+    "endpoint_map_source": "§6.3 / CONTRACTS.md. Paths marked \"map\": \"exact\" appear verbatim in the CONTRACTS.md endpoint map; paths marked \"map\": \"convention\" follow the tools-<agent>-<verb> naming convention for tools that share a directory but were not spelled out individually in the map (get_provider_task, get_verified_leverage, save_consumer_decision, log_intake_event). mark_callback_or_decline and finalize_call_outcome both POST to /tools-caller-finalize; the server branches on `outcome`.",
     "end_call": "end_call is the built-in ElevenLabs system end-call tool (no webhook). It is added to every agent's allowlist but is not a Grace webhook."
   },
 
@@ -17,7 +17,7 @@
           "name": "get_case_context",
           "description": "Read the current draft CaseSpec and the list of unresolved fields for this case. Read-only. Call once at the start of intake to orient before asking questions.",
           "method": "GET",
-          "url": "{{APP_BASE_URL}}/cases/{case_id}/context",
+          "url": "{{APP_BASE_URL}}/cases-context?case_id={case_id}",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -32,7 +32,7 @@
           "name": "patch_case_spec",
           "description": "Apply a partial update to the draft CaseSpec AFTER a fact has been explicitly confirmed by the caller. One blocking write at a checkpoint only. Never set mention_budget true unless the caller explicitly authorized disclosing a budget (INV-04). Server increments version on a confirmed edit.",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/intake/case-patch",
+          "url": "{{APP_BASE_URL}}/tools-intake-case-patch",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -79,7 +79,7 @@
           "name": "confirm_case_spec",
           "description": "Freeze the CaseSpec after reading a concise spoken summary back and receiving an explicit YES. Sets confirmed_at and the confirmed version/hash that all three provider tasks must share (INV-03). Call at most once.",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/intake/confirm",
+          "url": "{{APP_BASE_URL}}/tools-intake-confirm",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -97,7 +97,7 @@
           "name": "log_intake_event",
           "description": "Record an intake checkpoint or state marker (e.g. consent_affirmed, budget_declined, pause_requested, skip_requested, disclosure_repeated). Metadata only. Does not persist transcript when transcription consent is false (INV-07).",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/intake/event",
+          "url": "{{APP_BASE_URL}}/tools-intake-event",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -123,7 +123,7 @@
           "name": "get_provider_task",
           "description": "Read the single ProviderCallTask for this session (facts_allowed and questions_required). Read-only. verified_leverage is always null for the Caller — this agent never receives or cites competitor leverage (§5.4, INV-11).",
           "method": "GET",
-          "url": "{{APP_BASE_URL}}/tools/caller/task",
+          "url": "{{APP_BASE_URL}}/tools-caller-task",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -140,7 +140,7 @@
           "name": "log_quote_item",
           "description": "Persist one confirmed line item as the provider states it. amount MAY be null when unknown (INV-08). required_for_case reflects whether the family's spec needs it. Attach the transcript evidence turn/time so every amount is traceable.",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/caller/quote-item",
+          "url": "{{APP_BASE_URL}}/tools-caller-quote-item",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -178,7 +178,7 @@
           "name": "mark_callback_or_decline",
           "description": "Record a non-quote terminal outcome: callback requested, declined, unavailable/no-answer, or consent_declined. Metadata only; no transcript stored on consent_declined (INV-07). Retry policy for unavailable is enforced server-side (retry once only).",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/caller/finalize",
+          "url": "{{APP_BASE_URL}}/tools-caller-finalize",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -197,7 +197,7 @@
           "name": "finalize_call_outcome",
           "description": "Close the session for an itemized_quote outcome: submit the assembled quote summary (subtotals, total, price_type, assumptions, missing_fields, written_confirmation status). Does NOT accept, book, or commit anything (INV-06). Deterministic normalize/audit runs server-side after this.",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/caller/finalize",
+          "url": "{{APP_BASE_URL}}/tools-caller-finalize",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -229,7 +229,7 @@
           "name": "get_audited_comparison",
           "description": "Read audited quote totals, assumptions, fit, missing fields, and audit flags across providers. Read-only. START CONDITION: the Closer must not begin negotiation or explanation unless this call succeeds.",
           "method": "GET",
-          "url": "{{APP_BASE_URL}}/tools/closer/comparison",
+          "url": "{{APP_BASE_URL}}/tools-closer-comparison",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -245,7 +245,7 @@
           "name": "get_verified_leverage",
           "description": "Return ONLY an audited, comparable competing quote's id, supported_amount, and the exact allowed_disclosure_sentence. Provider-negotiation mode only. The leverage quote must exist and be audited (INV-05). Never fabricate a competitor (INV-11).",
           "method": "GET",
-          "url": "{{APP_BASE_URL}}/tools/closer/leverage",
+          "url": "{{APP_BASE_URL}}/tools-closer-leverage",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -261,7 +261,7 @@
           "name": "log_revised_terms",
           "description": "Persist a changed price or term with transcript evidence. CANNOT accept, book, or commit (INV-06). Records before/after amount, changed category, and term change only.",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/closer/revision",
+          "url": "{{APP_BASE_URL}}/tools-closer-revision",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -292,7 +292,7 @@
           "name": "get_ranked_report",
           "description": "Return the deterministic RankedReport: scores, tie status, recommendation/runner-up, material trade-off, evidence, and next human action. Read-only. Used in consumer-explanation mode.",
           "method": "GET",
-          "url": "{{APP_BASE_URL}}/tools/closer/report",
+          "url": "{{APP_BASE_URL}}/tools-closer-report",
           "map": "exact",
           "parameters": {
             "type": "object",
@@ -308,7 +308,7 @@
           "name": "save_consumer_decision",
           "description": "Record the consumer's stated preference or a request for follow-up. NEVER creates a provider commitment, booking, or payment (INV-06). Consumer-explanation mode only.",
           "method": "POST",
-          "url": "{{APP_BASE_URL}}/tools/closer/decision",
+          "url": "{{APP_BASE_URL}}/tools-closer-decision",
           "map": "exact",
           "parameters": {
             "type": "object",

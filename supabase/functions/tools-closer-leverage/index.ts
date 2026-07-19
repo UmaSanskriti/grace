@@ -16,7 +16,7 @@ import { rankProviders } from "../_shared/ranking/rank.ts";
 import { json, error } from "../_shared/respond.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import type { CaseSpec, QuoteResult, VerifiedLeverage } from "../_shared/types.ts";
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

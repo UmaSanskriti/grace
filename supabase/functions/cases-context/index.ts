@@ -21,7 +21,7 @@ import type {
   QuoteResult,
   VerifiedLeverage,
 } from "../_shared/types.ts";
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 const MAX_CHARS = 4000;
 

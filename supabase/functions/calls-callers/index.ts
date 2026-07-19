@@ -24,8 +24,8 @@ import {
   twilioPhoneNumberE164,
 } from "../_shared/env.ts";
 import type { CaseSpec, ProviderCallTask } from "../_shared/types.ts";
-import disclosure from "../../../config/disclosure.json" with { type: "json" };
-import vertical from "../../../config/vertical.json" with { type: "json" };
+import disclosure from "../_shared/config/disclosure.json" with { type: "json" };
+import vertical from "../_shared/config/vertical.json" with { type: "json" };
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;

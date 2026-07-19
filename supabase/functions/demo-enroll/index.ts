@@ -19,7 +19,7 @@ import {
   twilioPhoneNumberE164,
 } from "../_shared/env.ts";
 import type { ConsentRecord } from "../_shared/types.ts";
-import disclosure from "../../../config/disclosure.json" with { type: "json" };
+import disclosure from "../_shared/config/disclosure.json" with { type: "json" };
 
 interface EnrollBody {
   phone_e164?: string;
