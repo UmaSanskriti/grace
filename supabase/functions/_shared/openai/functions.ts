@@ -173,7 +173,12 @@ TRUTH: Use ONLY what the provider actually stated in the transcript plus the Pro
 
 EVIDENCE (INV-08): Every line-item amount MUST carry a source EvidenceRef (conversation_id + turn_index, with start/end seconds when known) pointing to where the provider stated it, OR the amount must be null (unknown). Never attach evidence to a number the provider did not say.
 
-ITEMIZATION: Map each stated charge to a quote category. Mark required_for_case using the task's required questions and family must-haves. Record unresolved required categories in missing_fields and stated caveats in assumptions. Set price_type (firm/estimate/range/package). Set written_confirmation to requested/received/none based on the transcript. Compute funeral_home_subtotal, cash_advance_total, and total only from evidenced line items; use null when they cannot be derived. Do not add audit_flags here (leave the array empty); auditing is a separate step. confidence is 0..1.`;
+ITEMIZATION: Map each stated charge to a quote category. Mark required_for_case using the task's required questions and family must-haves. Record unresolved required categories in missing_fields and stated caveats in assumptions. Set price_type (firm/estimate/range/package). Set written_confirmation to requested/received/none based on the transcript. Do not add audit_flags here (leave the array empty); auditing is a separate step. confidence is 0..1.
+
+NO DOUBLE-COUNTING (critical): A headline/package price is often a MARKETING NUMBER that is later SUPERSEDED when the provider itemizes. When both a headline and an itemized breakdown appear, keep ONLY the itemized components and DROP the headline line entirely — never include both, or the subtotal inflates. Each real charge appears exactly once.
+WORKED EXAMPLE (follow exactly): Provider opens with "$1,795 for direct cremation", then when asked itemizes basic services $1,150, hospital transfer $695, refrigeration/care $350, private goodbye $600, crematory $500, alternative container $250, permits/certificates $220, and after-hours $675. The "$1,795" was a headline that is SUPERSEDED — return the 8 itemized components ONLY (they sum to $4,440). Do NOT also emit a "$1,795 direct cremation" line. Result: funeral_home_subtotal=4440, cash_advance_total=0 (unless stated separately), total=4440.
+
+RECONCILIATION: The line items must reconcile arithmetically. funeral_home_subtotal = sum of all non-cash-advance line-item amounts; cash_advance_total = sum of cash-advance/third-party items; total = funeral_home_subtotal + cash_advance_total. Compute these ONLY from evidenced line items; use null when a value cannot be derived. Before returning, verify sum(line_items) equals funeral_home_subtotal + cash_advance_total; if it does not, you have double-counted or mis-bucketed — fix the line items so they reconcile.`;
 
 /** audit_quote — derived from §5.9 + config red flags. */
 export const AUDIT_QUOTE_SYSTEM = `You are the Grace quote auditor. Given a normalized QuoteResult and its transcript evidence, detect problems and recalculate the total. Values are synthetic.
@@ -181,7 +186,8 @@ export const AUDIT_QUOTE_SYSTEM = `You are the Grace quote auditor. Given a norm
 DETECT (emit an AuditFlag per issue, with evidence when available):
 - missing_after_hours_fee / missing_transfer_fee: a required fee category is absent though the case implies it.
 - package_only_pricing: only a bundled package price is given with no itemization.
-- inconsistent_totals / line_items_do_not_sum_to_total: the stated total does not equal the sum of line items (+ cash advances).
+- inconsistent_totals / line_items_do_not_sum_to_total: emit ONLY when the QuoteResult's OWN arithmetic is wrong — i.e. sum(line_items amounts) + cash_advance_total differs from QuoteResult.total by more than $1. Compute this sum yourself first. If it reconciles, DO NOT emit this flag. A low opening/headline price that was later itemized up to a correct, reconciling total is NOT an arithmetic inconsistency (that is expected hidden-fee behavior) — capture it as info:low_headline_pricing instead, noting the headline vs resolved total.
+- missing fees: if the resolved itemization is complete and reconciles, do not flag missing fees.
 - unverified_law_claim: the provider asserts a legal requirement without a verifiable basis. Do NOT accuse of a violation; mark the quote incomplete and advise verification.
 
 Severity: info/warn/error. Do not apply the Funeral Rule to cemeteries or third-party sellers without checking coverage.
