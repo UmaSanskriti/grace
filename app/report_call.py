@@ -36,8 +36,25 @@ def _money(x: object) -> str:
 
 
 def _homes_called(case_id: str) -> int:
+    """Count only quote records that represent an actual dial attempt.
+
+    `quotes/*.json` also holds `_mark_unreachable` records (calls.py) for homes
+    that were never dialed at all — no phone number on file, or skipped as a
+    non-DEMO_TARGET in DEMO_MODE — so counting every file overstates how many
+    homes were really called. `call_id` is the exact discriminator: it is
+    always None on a `_mark_unreachable` record and always set on a real quote
+    (calls.py), so it distinguishes "we dialed and got X" from "we never
+    picked up the phone."
+    """
     qdir = storage.case_dir(case_id) / "quotes"
-    return len(list(qdir.glob("*.json"))) if qdir.exists() else 0
+    if not qdir.exists():
+        return 0
+    n = 0
+    for p in qdir.glob("*.json"):
+        q = storage.read_json(case_id, f"quotes/{p.name}") or {}
+        if q.get("call_id"):
+            n += 1
+    return n
 
 
 def _best_home(case_id: str) -> tuple[str, object]:
@@ -97,6 +114,24 @@ def _fallback_summary(case_id: str) -> str:
     )
 
 
+def _recommendation_constraint(case_id: str) -> str:
+    """The one recommendation the spoken summary is bound to.
+
+    _best_home is the gated, evidenced truth (unagreed negotiations excluded);
+    report.md (app/report.py) applies no such filter and its LLM may recommend
+    on value rather than price. Handing this to the summarizer as an explicit
+    constraint keeps report_summary from naming a different home or price than
+    recommended_home/final_price state on the same call.
+    """
+    name, price = _best_home(case_id)
+    return (
+        "AUTHORITATIVE CONSTRAINT — this governs if the report body conflicts with it: "
+        f"the recommended funeral home is {name or NO_RECOMMENDATION} and the confirmed "
+        f"final price is {_money(price) or NO_PRICE}. Do not name any other home as the "
+        "recommendation, and do not state any other figure as the confirmed price."
+    )
+
+
 def summarize_for_speech(case_id: str, md: str) -> tuple[str, str]:
     """Turn report.md into spoken prose. Returns (text, "llm" | "fallback").
 
@@ -104,13 +139,14 @@ def summarize_for_speech(case_id: str, md: str) -> tuple[str, str]:
     better than handing the agent a blank to improvise around.
     """
     try:
+        constraint = _recommendation_constraint(case_id)
         client = OpenAI(api_key=settings.openai_api_key)
         model = getattr(settings, "openai_extraction_model", "") or _EXTRACTION_MODEL_DEFAULT
         resp = client.responses.create(
             model=model,
             input=[
                 {"role": "system", "content": _extraction_prompt("report_speech.md")},
-                {"role": "user", "content": "REPORT:\n" + md},
+                {"role": "user", "content": constraint + "\n\nREPORT:\n" + md},
             ],
         )
         text = (resp.output_text or "").strip()
@@ -170,6 +206,21 @@ def _record(
 
 
 def _deliver(case_id: str, md: str) -> dict:
+    # A prior "placed" call means the family's phone already rang for this
+    # report — return that record instead of dialing again. This is the only
+    # thing standing between start_next_nego_call's post-hoc status guard (see
+    # calls.py) and a second call landing during the window between a placed
+    # call and set_status(case_id, "done"): a retried webhook, or a second
+    # entrant that read status=="negotiating" before that write lands, both
+    # re-enter here. A "skipped"/"failed"/"aborted" prior record is not a
+    # placed call, so it must still allow a legitimate retry.
+    prior = storage.read_json(case_id, "report_call.json")
+    if prior and prior.get("status") == "placed":
+        log.info(
+            "report call already placed case=%s call_id=%s — not dialing again",
+            case_id, prior.get("call_id"),
+        )
+        return prior
     if storage.is_aborted(case_id):
         return _record(case_id, "aborted", notes="case aborted")
     if not settings.elevenlabs_report_agent_id:

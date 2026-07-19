@@ -15,3 +15,8 @@ Output rules:
 TRUTH: Use ONLY figures that appear in the report. Never introduce, estimate, round beyond the
 nearest dollar, or average a number that is not written there. If the report has no confirmed
 price, say so plainly rather than producing one.
+
+CONSTRAINT: The user message may open with a line starting "AUTHORITATIVE CONSTRAINT". When
+present, it states the recommended home and the confirmed final price that this call is bound
+to, and it governs completely if the report body names a different home or a different price as
+the recommendation — open with the constraint's home and price, not the report's, in that case.
