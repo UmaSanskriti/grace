@@ -12,7 +12,7 @@ import logging
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from . import research, storage
+from . import calls, research, storage
 from .config import settings
 from .elevenlabs_client import ElevenLabsError, outbound_call
 from .extraction import extract_user_info
@@ -157,12 +157,24 @@ async def elevenlabs_webhook(request: Request, background: BackgroundTasks) -> d
         status = _handle_intake(case_id, parsed.transcript_text)
         result["status"] = status
         if status == "intake_done":
-            # Kick research off the request path so the webhook returns fast.
-            background.add_task(research.run_research, case_id)
+            # Research + first quote call, off the request path (fast webhook).
+            background.add_task(_pipeline_after_intake, case_id)
+    elif agent_type == "quote":
+        background.add_task(
+            calls.handle_quote_result,
+            case_id, fh_id, parsed.conversation_id, parsed.transcript_text,
+        )
     else:
         log.info("no handler for agent=%s yet (transcript saved)", agent_type)
 
     return result
+
+
+def _pipeline_after_intake(case_id: str) -> None:
+    """Background: research, then kick the first quote call if it succeeded."""
+    res = research.run_research(case_id)
+    if res.get("ok"):
+        calls.start_next_quote_call(case_id)
 
 
 def _handle_intake(case_id: str, transcript: str) -> str:
@@ -232,6 +244,8 @@ def advance_case(case_id: str) -> dict:
 
     if status in ("intake_done", "researching", "research_failed"):
         result = research.run_research(case_id)
+        if result.get("ok"):
+            result["quote_call"] = calls.start_next_quote_call(case_id)
         return {
             "case_id": case_id,
             "ran": "research",
@@ -239,8 +253,17 @@ def advance_case(case_id: str) -> dict:
             "status": (storage.read_case(case_id) or {}).get("status"),
         }
 
+    if status == "calling_for_quotes":
+        result = calls.start_next_quote_call(case_id)
+        return {
+            "case_id": case_id,
+            "ran": "quote_call",
+            "result": result,
+            "status": (storage.read_case(case_id) or {}).get("status"),
+        }
+
     return {
         "case_id": case_id,
         "status": status,
-        "note": f"no automated step for status {status!r} yet (Slice 4+)",
+        "note": f"no automated step for status {status!r} yet (Slice 5+)",
     }

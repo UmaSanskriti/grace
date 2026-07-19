@@ -204,9 +204,61 @@ def extract_user_info(transcript: str) -> dict:
     return data
 
 
+# Structured-output schema for the LLM portion of a quote. Orchestration adds
+# funeral_home_id / call_id / transcript_path around this (see app/calls.py).
+QUOTE_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "reached", "quoted_price_usd", "price_type", "includes", "excludes",
+        "availability", "notes",
+    ],
+    "properties": {
+        "reached": {"type": "boolean"},
+        "quoted_price_usd": _nullable("number"),
+        "price_type": _enum("total_package", "starting_from", "per_item", "unknown"),
+        "includes": _str_array(),
+        "excludes": _str_array(),
+        "availability": _nullable("string"),
+        "notes": {"type": "string"},
+    },
+}
+
+
+def _validate_quote(data: dict) -> list[str]:
+    errors: list[str] = []
+    for key in QUOTE_SCHEMA["required"]:
+        if key not in data:
+            errors.append(f"missing required field: {key}")
+    price = data.get("quoted_price_usd")
+    if price is not None and not isinstance(price, (int, float)):
+        errors.append("quoted_price_usd must be a number or null")
+    if not isinstance(data.get("reached"), bool):
+        errors.append("reached must be a boolean")
+    return errors
+
+
 def extract_quote(transcript: str) -> dict:
-    """Quote-call transcript -> quotes/{fh_id}.json shape. TODO(Slice 4)."""
-    raise NotImplementedError
+    """Quote-call transcript -> the LLM portion of quotes/{fh_id}.json (Slice 4).
+
+    Validates output; on failure retries once with the errors appended.
+    """
+    system_prompt = _extraction_prompt("extract_quote.md")
+    user_content = f"QUOTE CALL TRANSCRIPT:\n{transcript}"
+
+    data = _call_structured(system_prompt, user_content, "quote", QUOTE_SCHEMA)
+    errors = _validate_quote(data)
+    if errors:
+        retry_content = (
+            f"{user_content}\n\nYour previous output failed validation:\n- "
+            + "\n- ".join(errors)
+            + "\nReturn corrected JSON."
+        )
+        data = _call_structured(system_prompt, retry_content, "quote", QUOTE_SCHEMA)
+        errors = _validate_quote(data)
+        if errors:
+            raise ValueError(f"quote extraction failed validation twice: {errors}")
+    return data
 
 
 def extract_final_price(transcript: str) -> dict:
