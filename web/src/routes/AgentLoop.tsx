@@ -428,6 +428,18 @@ export default function AgentLoop() {
     return PIPELINE.findIndex((s) => s.derive(view).state === "active");
   }, [view]);
 
+  // /agent-activity derives this feed oldest-first — current status, then
+  // quotes, then negotiations in the order they happened — and every entry
+  // carries the same case timestamp, so sorting by time is a no-op. Taking the
+  // first 8 therefore pinned the ticker to the START of the run and hid the
+  // negotiations entirely. Newest first, with the status line kept on top
+  // because it describes the case right now rather than a past step.
+  const recentEvents = useMemo(() => {
+    const all = view?.events ?? [];
+    const isStatus = (e: Activity["events"][number]) => e.type.startsWith("status:");
+    return [...all.filter(isStatus), ...all.filter((e) => !isStatus(e)).reverse()].slice(0, 8);
+  }, [view]);
+
   return (
     <div className="space-y-5">
       <style>{`
@@ -566,7 +578,7 @@ export default function AgentLoop() {
             <div className="rounded-xl border border-grace-border bg-white p-3 lg:w-1/2">
               <div className="mb-1 text-xs font-semibold text-grace-muted">Recent events</div>
               <div className="max-h-28 space-y-1 overflow-y-auto">
-                {view.events.length ? view.events.slice(0, 8).map((e, i) => (
+                {recentEvents.length ? recentEvents.map((e, i) => (
                   <div key={i} className="flex items-center justify-between text-[11px]">
                     <span className="font-mono text-grace-ink">{e.type}</span>
                     <span className="text-grace-muted">{e.actor}</span>
