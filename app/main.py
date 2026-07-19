@@ -10,9 +10,10 @@ from __future__ import annotations
 import logging
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import calls, research, storage, strategy
+from . import calls, research, storage, strategy, web_api
 from .config import settings
 from .elevenlabs_client import ElevenLabsError, outbound_call
 from .extraction import extract_user_info
@@ -22,6 +23,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("grace")
 
 app = FastAPI(title="Grace Orchestrator", version="0.1.0")
+
+# The dashboard runs on the Vite dev server (a different origin). Demo-only:
+# tighten to the deployed origin before this is exposed publicly.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Adapter routes the React dashboard polls (/agent-activity, /call-transcript,
+# /demo-call). Kept in their own module so the pipeline surface stays untouched.
+app.include_router(web_api.router)
 
 
 @app.get("/health")

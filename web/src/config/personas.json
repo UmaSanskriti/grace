@@ -1,0 +1,115 @@
+{
+  "$schema_version": "grace-demo-v1",
+  "note": "SYNTHETIC demo data only. Prices exist solely to exercise normalization and negotiation logic. Do not represent a real funeral home.",
+  "synthetic_case_summary": "California at-need case: hospital pickup near ZIP 94304; cremation; private family goodbye before cremation; Spanish-language support preferred; memorial later; return of ashes; six certified copies requested for quote comparison.",
+  "price_categories": [
+    "basic_services",
+    "hospital_transfer",
+    "care_refrigeration",
+    "private_goodbye",
+    "crematory",
+    "alternative_container",
+    "permits_certificates",
+    "after_hours_admin"
+  ],
+  "personas": [
+    {
+      "provider_id": "demo_transparent",
+      "persona_id": "A",
+      "label": "Transparent family-owned director",
+      "motivation": "Earn trust and win on clarity/service, not headline price.",
+      "capacity": "Pickup available within 4 hours; private goodbye tomorrow.",
+      "behavior": "Itemizes readily; asks one clarifying question; no hard sell.",
+      "hard_constraint": "Cannot reduce basic services fee or crematory charge.",
+      "prices": {
+        "basic_services": 1700,
+        "hospital_transfer": 495,
+        "care_refrigeration": 250,
+        "private_goodbye": 450,
+        "crematory": 425,
+        "alternative_container": 150,
+        "permits_certificates": 190,
+        "after_hours_admin": 0
+      },
+      "initial_total": 3660,
+      "resolved_total": 3940,
+      "resolved_note": "May add six certificates to the originally calculated service subtotal.",
+      "allowed_concession": {
+        "type": "include_item",
+        "description": "Include six certificates OR 10 extra transport miles at no price increase.",
+        "price_delta": 0
+      },
+      "distinct_outcome": "Best certainty and communication; modest total.",
+      "prohibited_disclosures": ["real business identity", "any non-synthetic detail"]
+    },
+    {
+      "provider_id": "demo_package_first",
+      "persona_id": "B",
+      "label": "Package-first stonewaller",
+      "motivation": "Protect package margin and reduce phone time.",
+      "capacity": "Pickup next morning; Spanish staff only after 2 p.m.",
+      "behavior": "Starts with a $3,600 range/package; resists itemization once, then must disclose itemization or offer written GPL after Grace asks again.",
+      "hard_constraint": "Must disclose itemization or offer written GPL after Grace asks a second time.",
+      "prices": {
+        "basic_services": 1550,
+        "hospital_transfer": 450,
+        "care_refrigeration": 250,
+        "private_goodbye": 400,
+        "crematory": 450,
+        "alternative_container": 150,
+        "permits_certificates": 200,
+        "after_hours_admin": 800
+      },
+      "initial_total": 3600,
+      "initial_total_is_package_range": true,
+      "resolved_total": 4250,
+      "resolved_note": "Total resolves to $4,250 after after-hours, permits, and certificates.",
+      "allowed_concession": {
+        "type": "reduce_amount",
+        "category": "after_hours_admin",
+        "description": "May reduce $150 admin component ONLY if Grace cites a verified lower comparable quote.",
+        "price_delta": -150,
+        "requires_verified_leverage": true
+      },
+      "distinct_outcome": "Complete only after friction; acceptable fit, lower trust."
+    },
+    {
+      "provider_id": "demo_hidden_fee",
+      "persona_id": "C",
+      "label": "Low headline, hidden-fee operator",
+      "motivation": "Attract calls with low headline; preserve margin in add-ons.",
+      "capacity": "Immediate pickup only; after-hours fee applies.",
+      "behavior": "Quotes $1,795 direct cremation first; omits transfer, goodbye, and after-hours until asked directly. Must answer direct category questions truthfully.",
+      "hard_constraint": "Must answer direct category questions truthfully once asked.",
+      "prices": {
+        "basic_services": 1150,
+        "hospital_transfer": 695,
+        "care_refrigeration": 350,
+        "private_goodbye": 600,
+        "crematory": 500,
+        "alternative_container": 250,
+        "permits_certificates": 220,
+        "after_hours_admin": 675
+      },
+      "headline_quote": 1795,
+      "headline_note": "$1,795 'direct cremation' headline omits transfer, goodbye, after-hours.",
+      "resolved_total": 4440,
+      "resolved_note": "Total resolves to $4,440 after all case-required items.",
+      "allowed_concession": {
+        "type": "waive_fee",
+        "category": "after_hours_admin",
+        "description": "May waive the $450 after-hours fee ONLY when shown a verified comparable quote.",
+        "price_delta": -450,
+        "requires_verified_leverage": true,
+        "revised_total": 3990,
+        "post_condition": "Must request written confirmation."
+      },
+      "distinct_outcome": "Measurable improvement caused by verified leverage."
+    }
+  ],
+  "roleplayer_console": {
+    "banner": "SYNTHETIC DEMO — DO NOT REPRESENT A REAL FUNERAL HOME",
+    "buttons": ["reveal_item", "offer_callback", "concede", "end_decline"],
+    "never_calls_grace": true
+  }
+}

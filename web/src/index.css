@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-grace-bg text-grace-ink antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Focus visibility for accessibility (bereavement context: clear, calm). */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid #4a5c52;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Lightweight markdown rendering for the evidence ledger panel. */
+.md-body {
+  @apply text-sm leading-relaxed text-grace-ink;
+}
+.md-body h1 {
+  @apply text-lg font-semibold mt-4 mb-2;
+}
+.md-body h2 {
+  @apply text-base font-semibold mt-4 mb-2;
+}
+.md-body h3 {
+  @apply text-sm font-semibold mt-3 mb-1;
+}
+.md-body p {
+  @apply my-2;
+}
+.md-body ul {
+  @apply list-disc pl-5 my-2 space-y-1;
+}
+.md-body ol {
+  @apply list-decimal pl-5 my-2 space-y-1;
+}
+.md-body code {
+  @apply bg-grace-accentSoft px-1 py-0.5 rounded text-[0.8em];
+}
+.md-body table {
+  @apply w-full border-collapse my-3 text-xs;
+}
+.md-body th,
+.md-body td {
+  @apply border border-grace-border px-2 py-1 text-left;
+}
+.md-body hr {
+  @apply my-4 border-grace-border;
+}
+.md-body strong {
+  @apply font-semibold;
+}

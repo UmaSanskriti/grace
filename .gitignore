@@ -5,3 +5,10 @@ __pycache__/
 *.pyc
 .ruff_cache/
 .pytest_cache/
+
+# JS tooling — arrived with the web/ dashboard; web/ has its own ignores too.
+node_modules/
+package-lock.json
+
+# Local editor/agent settings, not shared config.
+.claude/settings.local.json

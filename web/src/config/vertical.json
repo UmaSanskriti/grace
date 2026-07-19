@@ -1,0 +1,102 @@
+{
+  "$schema_version": "grace-demo-v1",
+  "jurisdiction": { "country": "US", "state": "CA" },
+  "intake_questions": [
+    { "area": "urgency_custody", "intent": "Has a death occurred? Where is the person now? Is there a transfer deadline?", "affects": ["custody", "timing"] },
+    { "area": "authority", "intent": "Are you authorized to request arrangements, or assisting someone who is?", "affects": ["authority"] },
+    { "area": "disposition", "intent": "Cremation, burial, green burial, donation, undecided, or another preference.", "affects": ["disposition"] },
+    { "area": "service_shape", "intent": "Private goodbye, viewing, ceremony, memorial later, graveside, livestream, none.", "affects": ["service_preferences"] },
+    { "area": "must_haves", "intent": "Religion/culture/community practices, timing, washing/dressing, language, clergy, accessibility.", "affects": ["must_haves"] },
+    { "area": "logistics", "intent": "Pickup ZIP, destination, cemetery/plot, transport distance, repatriation, veteran/tribal items.", "affects": ["location", "logistics"] },
+    { "area": "cost_posture", "intent": "Lowest comparable total, balanced price and fit, or prioritize fit — never a forced dollar ceiling.", "affects": ["cost_posture"] },
+    { "area": "permissions", "intent": "Call, disclose specific facts, use verified quote, negotiate, and transcribe.", "affects": ["permissions"] }
+  ],
+  "budget_rule": {
+    "ask_spend_limit": false,
+    "default_mention_budget": false,
+    "note": "Grace never asks 'How much are you willing to spend?'. A volunteered range stays private (mention_budget=false) unless explicitly authorized. Estimate a market band only from confirmed spec + verified quotes; never present it as the family's budget."
+  },
+  "cost_posture_options": ["lowest_comparable_total", "balanced", "prioritize_fit"],
+  "facts_disallowed_defaults": ["cause_of_death", "social_security_number", "payment_data"],
+  "data_minimization_never_collect": [
+    "social_security_number", "government_id", "payment_card",
+    "medical_history", "cause_of_death", "full_death_certificate_data"
+  ],
+  "quote_categories": [
+    { "key": "basic_services", "label": "basic services / overhead", "funeral_rule": true },
+    { "key": "transfer", "label": "transfer of remains", "funeral_rule": true },
+    { "key": "embalming", "label": "embalming (if relevant and authorized)", "funeral_rule": true },
+    { "key": "care_refrigeration", "label": "other preparation / refrigeration", "funeral_rule": true },
+    { "key": "viewing_facilities", "label": "facilities and staff for viewing", "funeral_rule": true },
+    { "key": "ceremony", "label": "funeral or memorial ceremony", "funeral_rule": true },
+    { "key": "graveside", "label": "graveside service", "funeral_rule": true },
+    { "key": "transport_vehicles", "label": "hearse / limousine", "funeral_rule": true },
+    { "key": "direct_disposition", "label": "direct cremation / immediate burial", "funeral_rule": true },
+    { "key": "crematory", "label": "crematory charge", "funeral_rule": true },
+    { "key": "container", "label": "casket / alternative container / outer burial container", "funeral_rule": true },
+    { "key": "distance_after_hours", "label": "distance and after-hours", "funeral_rule": true },
+    { "key": "permits_certificates", "label": "permits and death certificates", "funeral_rule": true },
+    { "key": "cash_advances", "label": "cash advances / third-party items", "funeral_rule": true },
+    { "key": "taxes_fees", "label": "taxes and other fees", "funeral_rule": true }
+  ],
+  "questions_required": [
+    "basic_services", "transfer", "care_and_refrigeration", "private_goodbye",
+    "crematory", "container", "permits_and_certificates", "distance_and_after_hours",
+    "cash_advances", "taxes", "total", "price_expiration", "written_follow_up"
+  ],
+  "ranking": {
+    "weights": {
+      "must_have_fit": 0.30,
+      "comparable_total": 0.25,
+      "completeness_certainty": 0.20,
+      "timing_capacity": 0.15,
+      "communication_trust": 0.10
+    },
+    "rules": [
+      "Remove providers that fail a confirmed hard must-have (hard fail).",
+      "Do not normalize cost until required fee categories are resolved.",
+      "Apply audit penalties before scoring.",
+      "Recommend only if topScore - secondScore > 3.",
+      "Otherwise return a tie with the material trade-off.",
+      "Totals within 5% with different fit advantages also count as a tie."
+    ],
+    "recommend_margin_points": 3,
+    "tie_total_pct": 0.05
+  },
+  "red_flags": [
+    "package_only_pricing",
+    "missing_after_hours_fee",
+    "missing_transfer_fee",
+    "inconsistent_totals",
+    "unverified_law_claim",
+    "line_items_do_not_sum_to_total"
+  ],
+  "negotiation_policy": {
+    "policy_id": "grace-demo-v1",
+    "max_rounds": 2,
+    "max_price_asks_per_provider": 1,
+    "max_nonprice_fallbacks_per_provider": 1,
+    "allowed": [
+      "Match or approach a verified comparable total.",
+      "Remove optional items the family did not request.",
+      "Waive after-hours, mileage, container, or admin fee.",
+      "Include certificates, language support, or transport miles.",
+      "Hold price for a stated period or improve pickup timing."
+    ],
+    "not_allowed": [
+      "Invent a competitor or quote.",
+      "Claim the family cannot afford the quote.",
+      "Use guilt, threats, or pressure.",
+      "Misstate legal requirements.",
+      "Promise selection, payment, or immediate commitment."
+    ]
+  },
+  "consumer_rights_signals": [
+    "Ask for accurate telephone prices from the provider's current lists.",
+    "Ask what is included, optional, third-party, distance-based, or after-hours.",
+    "Ask whether a claimed requirement is law, cemetery policy, or provider policy.",
+    "Request written follow-up (do not demand GPL email as if always federally required).",
+    "Do not apply the Funeral Rule to cemeteries/third-party sellers without checking coverage.",
+    "Do not accuse a provider of violation; mark quote incomplete and advise verification."
+  ]
+}
