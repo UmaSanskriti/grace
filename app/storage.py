@@ -81,6 +81,26 @@ def read_case(case_id: str) -> dict | None:
     return _read_json(case_dir(case_id) / "case.json")
 
 
+def ensure_case(case_id: str, status: str = "active") -> dict:
+    """Return the case, creating a minimal case.json with `status` if missing.
+
+    Guards against a webhook routing to a case_id (via dynamic variables or the
+    index) whose case.json was never written — keeps transcript-save and
+    set_status from operating on a half-materialized case dir.
+    """
+    existing = read_case(case_id)
+    if existing is not None:
+        return existing
+    case = {
+        "case_id": case_id,
+        "status": status,
+        "created_at": _now_iso(),
+        "user_phone": "",
+    }
+    _write_json(case_dir(case_id) / "case.json", case)
+    return case
+
+
 def set_status(case_id: str, status: str) -> None:
     case = read_case(case_id)
     if case is None:

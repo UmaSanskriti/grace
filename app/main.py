@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from . import storage
 from .config import settings
 from .elevenlabs_client import ElevenLabsError, outbound_call
+from .extraction import extract_user_info
 from .webhook import WebhookVerificationError, parse_webhook, verify_signature
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -135,19 +136,62 @@ async def elevenlabs_webhook(request: Request) -> dict:
         case = storage.create_case(status="orphan_webhook")
         case_id = case["case_id"]
         log.warning("unrouted webhook -> orphan case %s", case_id)
+    else:
+        # Routed to a known id — make sure its case.json exists (a call placed
+        # outside /debug/call may reference a case that was never materialized).
+        storage.ensure_case(case_id)
 
     # Persist raw payload + human-readable transcript regardless of agent type.
     storage.save_raw_payload(case_id, parsed.conversation_id or "unknown", payload)
     name = f"{fh_id or agent_type or 'call'}_{parsed.conversation_id or 'x'}"
     storage.save_transcript(case_id, name, parsed.transcript_text)
 
-    # Slice 2+ dispatch hook. For now we log; handlers get wired per milestone.
     log.info(
         "saved transcript case=%s agent=%s fh=%s turns=%d summary=%r",
         case_id, agent_type, fh_id, len(parsed.transcript_turns), parsed.summary[:120],
     )
 
-    return {"ok": True, "case_id": case_id, "agent_type": agent_type, "fh_id": fh_id}
+    # Dispatch on agent type. Quote/nego extraction lands in Slice 4/5.
+    result: dict = {"ok": True, "case_id": case_id, "agent_type": agent_type, "fh_id": fh_id}
+    if agent_type == "intake":
+        result["status"] = _handle_intake(case_id, parsed.transcript_text)
+    else:
+        log.info("no handler for agent=%s yet (transcript saved)", agent_type)
+
+    return result
+
+
+def _handle_intake(case_id: str, transcript: str) -> str:
+    """Extract user_info.json from an intake transcript and advance the case.
+
+    Idempotent (webhooks may retry): skips if already extracted. Extraction
+    failures are logged and surfaced as a status, never a 5xx — returning 200
+    keeps ElevenLabs from retry-storming, and the case can be re-run manually.
+    """
+    if storage.read_json(case_id, "user_info.json") is not None:
+        log.info("intake case=%s already extracted, skipping", case_id)
+        return "intake_done"
+    if not transcript.strip():
+        log.warning("intake case=%s: empty transcript, skipping extraction", case_id)
+        return "intake_empty_transcript"
+    try:
+        user_info = extract_user_info(transcript)
+    except Exception as e:  # LLM / validation failure — don't fail the webhook
+        log.error("intake extraction failed case=%s: %s", case_id, e)
+        storage.set_status(case_id, "intake_extract_failed")
+        return "intake_extract_failed"
+
+    storage.save_json(case_id, "user_info.json", user_info)
+    storage.set_status(case_id, "intake_done")
+    log.info(
+        "intake extracted case=%s contact=%r service=%s unknowns=%d",
+        case_id,
+        user_info.get("contact_name"),
+        user_info.get("service_type"),
+        len(user_info.get("unknowns") or []),
+    )
+    # Slice 3 will kick research here (status -> researching).
+    return "intake_done"
 
 
 # --- read case state (demo UI) ---------------------------------------------
