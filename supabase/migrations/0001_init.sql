@@ -131,6 +131,7 @@ create table consents (
   consent_id          uuid        primary key default gen_random_uuid(),
   participant_id      uuid        not null references participants(participant_id) on delete cascade,
   scope               text        not null,      -- consent scope label
+  phone_hash          text,                       -- §4.1 consent record stores phone hash
   disclosure_version  text        not null,
   sms_opt_in          boolean     not null default false,
   ai_voice_opt_in     boolean     not null default false, -- INV-01 gate for calls

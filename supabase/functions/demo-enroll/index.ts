@@ -153,11 +153,16 @@ Deno.serve(async (req: Request) => {
   });
 
   // 4) Send the EXACT first preference SMS (disclosure.json messages.first_sms).
+  // Voice-first: SMS is OPTIONAL (spec §12.3 fallback ladder). If Twilio SMS
+  // credentials are absent or the send fails, log and continue so enrollment
+  // still succeeds and the case can proceed to a voice CALL.
   let messageSid = "";
+  let smsSent = false;
   try {
     messageSid = await sendSms(phone, disclosure.messages.first_sms);
+    smsSent = true;
   } catch (e) {
-    return error(`Failed to send preference SMS: ${(e as Error).message}`, 502);
+    console.log(`preference SMS skipped (voice-first): ${(e as Error).message}`);
   }
 
   await supa.from("messages").insert({
@@ -167,7 +172,7 @@ Deno.serve(async (req: Request) => {
     channel: "sms",
     provider_id: null,
     body: disclosure.messages.first_sms,
-    status: "sent",
+    status: smsSent ? "sent" : "skipped_no_sms",
     timestamp: new Date().toISOString(),
   });
 
@@ -183,5 +188,5 @@ Deno.serve(async (req: Request) => {
     idempotency_key: `pref_sms:${caseId}`,
   });
 
-  return json({ case_id: caseId, status: "PREFERENCE_SMS_SENT", message_sid: messageSid }, 201);
+  return json({ case_id: caseId, status: "PREFERENCE_SMS_SENT", message_sid: messageSid, sms_sent: smsSent }, 201);
 });

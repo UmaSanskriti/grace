@@ -89,25 +89,29 @@ async function request<T>(
 }
 
 export const api = {
-  /** POST /demo/enroll — create case, validate allowlist, store consent. */
+  // NOTE: Supabase serves each Edge Function at /functions/v1/<function-name>,
+  // so VITE_APP_BASE_URL ends in /functions/v1 and paths are the hyphenated
+  // function names (not the spec's clean /demo/enroll paths).
+
+  /** POST demo-enroll — create case, validate allowlist, store consent. */
   enroll(body: EnrollRequest): Promise<EnrollResponse> {
-    return request<EnrollResponse>("/demo/enroll", {
+    return request<EnrollResponse>("/demo-enroll", {
       method: "POST",
       body: JSON.stringify(body),
     });
   },
 
-  /** GET /cases/{id}/context — compact context + CaseSpec + ledger markdown. */
+  /** GET cases-context — compact context + CaseSpec + ledger markdown. */
   getContext(caseId: string): Promise<CaseContextResponse> {
     return request<CaseContextResponse>(
-      `/cases/${encodeURIComponent(caseId)}/context`
+      `/cases-context?case_id=${encodeURIComponent(caseId)}`
     );
   },
 
-  /** GET /cases/{id}/report — ranked report JSON + Markdown. */
+  /** GET cases-report — ranked report JSON + Markdown. */
   getReport(caseId: string): Promise<CaseReportResponse> {
     return request<CaseReportResponse>(
-      `/cases/${encodeURIComponent(caseId)}/report`
+      `/cases-report?case_id=${encodeURIComponent(caseId)}`
     );
   },
 };
