@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from . import storage
+from . import research, storage
 from .config import settings
 from .elevenlabs_client import ElevenLabsError, outbound_call
 from .extraction import extract_user_info
@@ -101,7 +101,7 @@ def debug_call(req: DebugCallRequest) -> dict:
 # --- single webhook entrypoint for all post-call events --------------------
 
 @app.post("/webhooks/elevenlabs")
-async def elevenlabs_webhook(request: Request) -> dict:
+async def elevenlabs_webhook(request: Request, background: BackgroundTasks) -> dict:
     raw = await request.body()
     try:
         verify_signature(raw, request.headers.get("ElevenLabs-Signature"))
@@ -154,7 +154,11 @@ async def elevenlabs_webhook(request: Request) -> dict:
     # Dispatch on agent type. Quote/nego extraction lands in Slice 4/5.
     result: dict = {"ok": True, "case_id": case_id, "agent_type": agent_type, "fh_id": fh_id}
     if agent_type == "intake":
-        result["status"] = _handle_intake(case_id, parsed.transcript_text)
+        status = _handle_intake(case_id, parsed.transcript_text)
+        result["status"] = status
+        if status == "intake_done":
+            # Kick research off the request path so the webhook returns fast.
+            background.add_task(research.run_research, case_id)
     else:
         log.info("no handler for agent=%s yet (transcript saved)", agent_type)
 
@@ -170,7 +174,7 @@ def _handle_intake(case_id: str, transcript: str) -> str:
     """
     if storage.read_json(case_id, "user_info.json") is not None:
         log.info("intake case=%s already extracted, skipping", case_id)
-        return "intake_done"
+        return "intake_skipped_existing"
     if not transcript.strip():
         log.warning("intake case=%s: empty transcript, skipping extraction", case_id)
         return "intake_empty_transcript"
@@ -217,13 +221,26 @@ def get_report(case_id: str) -> Response:
 def advance_case(case_id: str) -> dict:
     """Manual pipeline nudge (debug/demo safety valve).
 
-    Slice 2+: drives the state machine forward. Stub for now.
+    Runs the next automated step for the case's current status. Currently:
+    intake_done / research_failed -> run research. Quote/nego steps land in
+    Slice 4/5.
     """
     case = storage.read_case(case_id)
     if case is None:
         raise HTTPException(404, f"unknown case {case_id}")
+    status = case.get("status")
+
+    if status in ("intake_done", "researching", "research_failed"):
+        result = research.run_research(case_id)
+        return {
+            "case_id": case_id,
+            "ran": "research",
+            "result": result,
+            "status": (storage.read_case(case_id) or {}).get("status"),
+        }
+
     return {
         "case_id": case_id,
-        "status": case.get("status"),
-        "note": "advance not implemented yet (Slice 2+)",
+        "status": status,
+        "note": f"no automated step for status {status!r} yet (Slice 4+)",
     }
