@@ -127,3 +127,86 @@ def summarize_for_speech(case_id: str, md: str) -> tuple[str, str]:
             "We have finished calling funeral homes for you, and your written "
             "report is ready."
         ), "fallback"
+
+
+def _dynamic_vars(case_id: str, summary: str) -> dict[str, str]:
+    user_info = storage.read_json(case_id, "user_info.json") or {}
+    name, price = _best_home(case_id)
+    return {
+        "case_id": case_id,
+        "agent_type": "report",
+        "contact_name": (user_info.get("contact_name") or "").strip() or DEFAULT_CONTACT_NAME,
+        "report_summary": summary,
+        "recommended_home": name or NO_RECOMMENDATION,
+        "final_price": _money(price) or NO_PRICE,
+    }
+
+
+def _record(
+    case_id: str,
+    status: str,
+    *,
+    call_id: str | None = None,
+    to_number: str | None = None,
+    summary_source: str | None = None,
+    notes: str = "",
+) -> dict:
+    rec = {
+        "status": status,
+        "call_id": call_id,
+        "to_number": to_number,
+        "summary_source": summary_source,
+        "notes": notes,
+    }
+    storage.save_json(case_id, "report_call.json", rec)
+    log.info("report call case=%s status=%s notes=%s", case_id, status, notes)
+    return rec
+
+
+def _deliver(case_id: str, md: str) -> dict:
+    if storage.is_aborted(case_id):
+        return _record(case_id, "aborted", notes="case aborted")
+    if not settings.elevenlabs_report_agent_id:
+        return _record(case_id, "skipped", notes="ELEVENLABS_REPORT_AGENT_ID not set")
+
+    phone = (storage.read_case(case_id) or {}).get("user_phone") or ""
+    if not phone:
+        return _record(case_id, "skipped", notes="no user phone on file")
+    if settings.demo_mode and phone not in settings.demo_target_list:
+        return _record(
+            case_id, "skipped", to_number=phone,
+            notes="skipped: not a DEMO_TARGET in DEMO_MODE",
+        )
+
+    summary, source = summarize_for_speech(case_id, md)
+    try:
+        resp = outbound_call(
+            agent_id=settings.elevenlabs_report_agent_id,
+            to_number=phone,
+            dynamic_variables=_dynamic_vars(case_id, summary),
+        )
+    except ElevenLabsError as e:
+        return _record(
+            case_id, "failed", to_number=phone, summary_source=source, notes=str(e),
+        )
+
+    conv = resp.get("conversation_id", "")
+    if conv:
+        storage.index_conversation(conv, case_id, "report")
+    log.info("placed report call case=%s to=%s conversation_id=%s", case_id, phone, conv)
+    return _record(
+        case_id, "placed", call_id=conv or None, to_number=phone, summary_source=source,
+    )
+
+
+def deliver_report(case_id: str, md: str) -> dict:
+    """Call the family and read them the report. Returns the report_call.json record.
+
+    Never raises. The written report is the deliverable of record, so a call
+    that cannot be placed must not leave the case short of `done`.
+    """
+    try:
+        return _deliver(case_id, md)
+    except Exception as e:  # nothing here may break the pipeline's path to done
+        log.exception("report call crashed case=%s", case_id)
+        return _record(case_id, "failed", notes=f"unexpected error: {e}")

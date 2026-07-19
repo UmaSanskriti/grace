@@ -21,6 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import report_call, storage  # noqa: E402
+from app.config import settings  # noqa: E402
 
 failures: list[str] = []
 
@@ -133,17 +134,139 @@ def test_corrupt_quote_file_never_raises() -> None:
             check(summary.strip() != "", "summary is empty despite corrupt JSON on disk")
 
 
+class _Recorder:
+    """Captures outbound_call kwargs instead of dialing."""
+
+    def __init__(self, exc: Exception | None = None):
+        self.calls: list[dict] = []
+        self.exc = exc
+
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.exc:
+            raise self.exc
+        return {"success": True, "conversation_id": "conv_test_1"}
+
+
+def test_happy_path() -> None:
+    rec = _Recorder()
+    report_call.outbound_call = rec
+    settings.elevenlabs_report_agent_id = "agent_report_1"
+    settings.demo_mode = False
+
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        result = report_call.deliver_report(case_id, "# report")
+        saved = storage.read_json(case_id, "report_call.json")
+
+    check(result["status"] == "placed", f"expected placed, got {result!r}")
+    check(result["call_id"] == "conv_test_1", f"conversation id not recorded: {result!r}")
+    check(saved == result, f"report_call.json disagrees with the return value: {saved!r}")
+    check(len(rec.calls) == 1, f"expected exactly one call, got {len(rec.calls)}")
+
+    kw = rec.calls[0]
+    check(kw["agent_id"] == "agent_report_1", f"wrong agent id: {kw['agent_id']!r}")
+    check(kw["to_number"] == "+14155550123", f"wrong number: {kw['to_number']!r}")
+
+    dyn = kw["dynamic_variables"]
+    expected = {"case_id", "agent_type", "contact_name", "report_summary",
+                "recommended_home", "final_price"}
+    check(set(dyn) == expected, f"variable set drifted: {sorted(dyn)}")
+    blank = [k for k, v in dyn.items() if not str(v).strip()]
+    check(not blank, f"blank variables the agent could fill in itself: {blank}")
+    check(dyn["agent_type"] == "report", f"agent_type is {dyn['agent_type']!r}")
+    check(dyn["contact_name"] == "Dana Reyes", f"contact_name is {dyn['contact_name']!r}")
+    check(dyn["recommended_home"] == "Oak Hill", f"recommended_home is {dyn['recommended_home']!r}")
+    check(dyn["final_price"] == "$3,650", f"final_price is {dyn['final_price']!r}")
+
+
+def test_guards() -> None:
+    report_call.outbound_call = _Recorder()
+
+    # No agent id configured.
+    settings.elevenlabs_report_agent_id = ""
+    settings.demo_mode = False
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        r = report_call.deliver_report(case_id, "# report")
+    check(r["status"] == "skipped" and "REPORT_AGENT_ID" in r["notes"],
+          f"missing agent id not reported: {r!r}")
+
+    # No phone on file.
+    settings.elevenlabs_report_agent_id = "agent_report_1"
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td), user_phone="")
+        r = report_call.deliver_report(case_id, "# report")
+    check(r["status"] == "skipped" and "phone" in r["notes"],
+          f"missing phone not reported: {r!r}")
+
+    # DEMO_MODE with a number that isn't a demo target.
+    settings.demo_mode = True
+    settings.demo_targets = "+16505559876"
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        r = report_call.deliver_report(case_id, "# report")
+    check(r["status"] == "skipped" and "DEMO_TARGET" in r["notes"],
+          f"non-demo number not blocked: {r!r}")
+    settings.demo_mode = False
+
+    # Aborted case. Read report_call.json back INSIDE the block — once the
+    # TemporaryDirectory closes, storage.DATA_DIR points at nothing.
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        storage.set_aborted(case_id)
+        r = report_call.deliver_report(case_id, "# report")
+        # Every guard must write the record for the dashboard to read.
+        saved = storage.read_json(case_id, "report_call.json")
+    check(r["status"] == "aborted", f"aborted case still dialed: {r!r}")
+    check(saved == r, "a guard returned without writing report_call.json")
+
+
+def test_failures_never_raise() -> None:
+    settings.elevenlabs_report_agent_id = "agent_report_1"
+    settings.demo_mode = False
+
+    # ElevenLabs rejects the call.
+    report_call.outbound_call = _Recorder(exc=report_call.ElevenLabsError("402 no credits"))
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        r = report_call.deliver_report(case_id, "# report")
+    check(r["status"] == "failed" and "402" in r["notes"], f"call failure not recorded: {r!r}")
+    check(r["call_id"] is None, f"call_id set on a failed call: {r!r}")
+
+    # An unanticipated exception must still be swallowed.
+    report_call.outbound_call = _Recorder(exc=ValueError("something unforeseen"))
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        r = report_call.deliver_report(case_id, "# report")
+    check(r["status"] == "failed", f"unexpected exception escaped as {r!r}")
+
+    # A dead LLM must not stop the call going out.
+    rec = _Recorder()
+    report_call.outbound_call = rec
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        r = report_call.deliver_report(case_id, "# report")
+    check(r["status"] == "placed", f"dead LLM blocked the call: {r!r}")
+    check(r["summary_source"] == "fallback", f"summary_source is {r['summary_source']!r}")
+    check(rec.calls[0]["dynamic_variables"]["report_summary"].strip() != "",
+          "call placed with an empty report_summary")
+
+
 def main() -> int:
     report_call.OpenAI = _BoomOpenAI
     test_summary()
     test_unagreed_negotiation_ignored()
     test_corrupt_quote_file_never_raises()
+    test_happy_path()
+    test_guards()
+    test_failures_never_raise()
 
     if failures:
         for f in failures:
             print(f"FAIL: {f}")
         return 1
-    print("PASS: spoken summary degrades safely and never returns blank")
+    print("PASS: report call guards hold; no blank variables; nothing raises")
     return 0
 
 

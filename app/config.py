@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     elevenlabs_intake_agent_id: str = ""
     elevenlabs_quote_agent_id: str = ""
     elevenlabs_nego_agent_id: str = ""
+    elevenlabs_report_agent_id: str = ""
     elevenlabs_phone_number_id: str = ""
     # Optional: enables HMAC verification of post-call webhooks when set.
     elevenlabs_webhook_secret: str = ""
@@ -70,6 +71,7 @@ class Settings(BaseSettings):
             "intake": self.elevenlabs_intake_agent_id,
             "quote": self.elevenlabs_quote_agent_id,
             "nego": self.elevenlabs_nego_agent_id,
+            "report": self.elevenlabs_report_agent_id,
         }[agent_type]
 
 
