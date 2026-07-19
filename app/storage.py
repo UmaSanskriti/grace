@@ -110,6 +110,15 @@ def set_status(case_id: str, status: str) -> None:
     _write_json(case_dir(case_id) / "case.json", case)
 
 
+def set_user_phone(case_id: str, phone: str) -> None:
+    """Record the user's phone number on the case (for later SMS updates)."""
+    case = ensure_case(case_id)
+    if phone and case.get("user_phone") != phone:
+        case["user_phone"] = phone
+        case["updated_at"] = _now_iso()
+        _write_json(case_dir(case_id) / "case.json", case)
+
+
 def save_json(case_id: str, relpath: str, obj: Any) -> Path:
     path = case_dir(case_id) / relpath
     _write_json(path, obj)

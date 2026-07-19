@@ -60,6 +60,11 @@ class ParsedWebhook:
     summary: str
     data_collection: dict
     dynamic_variables: dict = field(default_factory=dict)
+    # From metadata.phone_call: for an inbound call external_number is the
+    # caller (the user); for outbound it's the number we dialed.
+    call_direction: str = ""
+    external_number: str = ""
+    agent_number: str = ""
     raw: dict = field(default_factory=dict)
 
     @property
@@ -90,6 +95,7 @@ def parse_webhook(payload: dict) -> ParsedWebhook:
     turns = data.get("transcript") or []
     analysis = data.get("analysis") or {}
     cicd = data.get("conversation_initiation_client_data") or {}
+    phone_call = (data.get("metadata") or {}).get("phone_call") or {}
     return ParsedWebhook(
         type=payload.get("type", ""),
         conversation_id=data.get("conversation_id", ""),
@@ -100,5 +106,8 @@ def parse_webhook(payload: dict) -> ParsedWebhook:
         summary=analysis.get("transcript_summary", "") or "",
         data_collection=analysis.get("data_collection_results", {}) or {},
         dynamic_variables=cicd.get("dynamic_variables", {}) or {},
+        call_direction=phone_call.get("direction", "") or "",
+        external_number=phone_call.get("external_number", "") or "",
+        agent_number=phone_call.get("agent_number", "") or "",
         raw=payload,
     )

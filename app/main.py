@@ -141,6 +141,12 @@ async def elevenlabs_webhook(request: Request, background: BackgroundTasks) -> d
         # outside /debug/call may reference a case that was never materialized).
         storage.ensure_case(case_id)
 
+    # Capture the user's phone from an inbound call (the caller is the user),
+    # so we can send SMS progress updates later.
+    if parsed.call_direction == "inbound" and parsed.external_number:
+        storage.set_user_phone(case_id, parsed.external_number)
+        log.info("captured user phone for case=%s (inbound caller)", case_id)
+
     # Persist raw payload + human-readable transcript regardless of agent type.
     storage.save_raw_payload(case_id, parsed.conversation_id or "unknown", payload)
     name = f"{fh_id or agent_type or 'call'}_{parsed.conversation_id or 'x'}"
