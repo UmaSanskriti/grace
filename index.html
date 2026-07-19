@@ -528,8 +528,157 @@ input[type="tel"]{border-radius:12px}
 .g-progressbar .p-live{background:var(--candle-soft)}
 .g-progresscap{font-size:.82rem;color:var(--ink-2);margin:0 0 1.2rem}
 
-/* soft band behind the card sections */
-.g-band{background:#FFF9EC;border-block:1px solid #F4E6C0}
+/* ═══ elevation pass: candlelight as the one living layer, discipline everywhere else ═══ */
+body{background:radial-gradient(1100px 540px at 82% -8%, #FDF1D4 0%, var(--linen) 58%)}
+::selection{background:var(--ink);color:var(--linen)}
+h1,h2,h3,h4{text-wrap:balance}
+p,li{text-wrap:pretty}
+
+/* signature: the flame breathes (killed globally by prefers-reduced-motion) */
+@keyframes g-flick{0%,100%{opacity:1}42%{opacity:.78}58%{opacity:.92}}
+@keyframes g-breathe{0%,100%{opacity:.9}50%{opacity:1.45}}
+.g-flame{animation:g-flick 3.8s ease-in-out infinite}
+.g-halo{animation:g-breathe 3.8s ease-in-out infinite}
+
+/* the headline turn carries a glow of the same light */
+.g-h1-teal{background-image:linear-gradient(transparent 64%, rgba(232,161,60,.36) 64%, rgba(232,161,60,.36) 90%, transparent 90%);border-radius:4px;padding:0 .06em;margin:0 -.06em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+
+/* glass header */
+.g-site-head{position:sticky;top:0;z-index:38;background:rgba(250,231,192,.78);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid rgba(59,59,59,.06)}
+
+/* sections as floating panels */
+.g-band{background:#FFF9EC;border:1px solid #F2E2B8;margin-inline:clamp(.5rem,2.5vw,1.6rem);border-radius:26px}
+
+/* ═══ modern layer: texture, depth, motion ═══ */
+::selection{background:var(--ink);color:var(--linen)}
+.g-hero{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E"),linear-gradient(180deg,#FCEFD0,var(--linen) 62%)}
+.g-band{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E"),linear-gradient(180deg,#FFFBF1,#FFF7E6)}
+.g-h1-teal{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 14' preserveAspectRatio='none'%3E%3Cpath d='M4 10q35-9 72-3t72 0t68-4' fill='none' stroke='%23E8A13C' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat left 101% / 100% .32em;padding-bottom:.16em}
+
+.g-site-head{position:sticky;top:0;z-index:35;background:rgba(250,231,192,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid rgba(59,59,59,.06)}
+
+.g-btn{transition:transform .14s ease,box-shadow .2s ease}
+.g-btn-fill{background:linear-gradient(180deg,#464646,#333);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 6px 16px rgba(59,59,59,.2)}
+.g-btn-fill:hover{background:linear-gradient(180deg,#3d3d3d,#2a2a2a)}
+@media (hover:hover){.g-btn:hover{transform:translateY(-1px)}}
+.g-btn:active{transform:translateY(0) scale(.985)}
+:where(button,input,summary):focus-visible{outline:2px solid var(--teal);outline-offset:2px;box-shadow:0 0 0 5px rgba(62,111,97,.16)}
+
+.g-stepgrid li,.g-stage,.g-dash-empty{border-radius:20px;background-image:linear-gradient(180deg,#fff,#FFFDF6);box-shadow:0 1px 2px rgba(59,59,59,.05),0 10px 24px rgba(59,59,59,.06)}
+@media (hover:hover){
+  .g-stepgrid li,.g-nevergrid li{transition:transform .18s ease,box-shadow .18s ease}
+  .g-stepgrid li:hover{transform:translateY(-2px);box-shadow:0 2px 3px rgba(59,59,59,.06),0 16px 32px rgba(59,59,59,.1)}
+  .g-nevergrid li:hover{transform:translateY(-1px)}
+}
+.g-stepgrid li:nth-child(2n) .g-stepico{background:#FBEFD3;color:#A4680A}
+
+.g-nevergrid{display:flex;flex-wrap:wrap;gap:.55rem;max-width:none}
+.g-nevergrid li{width:auto}
+
+.g-phone{box-shadow:0 26px 60px rgba(59,59,59,.24),0 6px 16px rgba(59,59,59,.12)}
+.g-phone::after{content:"";position:absolute;inset:0;border-radius:25px;background:linear-gradient(115deg,rgba(255,255,255,.32),rgba(255,255,255,0) 40%);pointer-events:none}
+.g-quote-pick{box-shadow:0 10px 26px rgba(46,158,82,.16)}
+
+.g-faq details{background:#FFFDF6;border:1px solid #F0E2BC;border-radius:14px;padding:.15rem 1.05rem;margin:0 0 .6rem}
+.g-faq details[open]{background:#FFF7E4}
+
+.g-bottomnav{inset-inline:auto;left:50%;transform:translateX(-50%);width:min(430px,calc(100% - 1.5rem));bottom:calc(.65rem + env(safe-area-inset-bottom));padding:.35rem .45rem;border:1px solid #EFE0B8;border-radius:22px;background:rgba(255,250,238,.92);box-shadow:0 12px 32px rgba(59,59,59,.18);z-index:55}
+.g-statusbar{z-index:58}
+.g-sheet-root{z-index:60}
+.g-bn-item{border-radius:16px}
+
+.g-flame,.g-halo{transform-box:fill-box;transform-origin:50% 88%;animation:g-flick 2.6s ease-in-out infinite}
+@keyframes g-flick{0%,100%{transform:rotate(0) scale(1)}38%{transform:rotate(1.7deg) scale(1.02)}70%{transform:rotate(-1.3deg) scale(.99)}}
+
+.g-prep{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s cubic-bezier(.2,.7,.2,1)}
+.g-prep.g-in{opacity:1;transform:none}
+
+/* soft view entrance on tab switch */
+@keyframes g-viewin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.g-hero,.g-section{animation:g-viewin .4s ease both}
+
+/* tactile cards */
+.g-stepgrid li,.g-stage,.g-nevergrid li,.g-faq details,.g-dash-empty,.g-phone{box-shadow:0 1px 2px rgba(59,59,59,.05),inset 0 1px 0 rgba(255,255,255,.6)}
+@media (hover:hover){
+  .g-stepgrid li,.g-btn,.g-btn .g-ico{transition:transform .16s ease,box-shadow .16s ease}
+  .g-stepgrid li:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(59,59,59,.10),inset 0 1px 0 rgba(255,255,255,.6)}
+  .g-btn:hover .g-ico{transform:translateY(-1px)}
+}
+.g-btn:active{transform:scale(.985)}
+.g-stepgrid li{position:relative}
+.g-stepgrid li::after{content:attr(data-n);position:absolute;top:.4rem;right:.8rem;font:700 1.9rem/1 var(--serif);color:var(--ink);opacity:.07}
+
+/* FAQ as quiet cards */
+.g-faq details{background:var(--card);border:1px solid #F0E2BC;border-radius:14px;padding:.1rem 1rem}
+.g-faq details + details{margin-top:.6rem}
+.g-faq details p{padding-right:1rem}
+
+/* nevers pair up on wide screens */
+@media (min-width:700px){.g-nevergrid{grid-template-columns:1fr 1fr;max-width:44rem}}
+
+/* the product shot sits in candlelight */
+.g-phone{box-shadow:0 18px 40px rgba(59,59,59,.15),0 0 54px rgba(232,161,60,.24)}
+@media (min-width:700px){.g-phone{transform:rotate(-1.3deg)}}
+
+/* ═══ modern layer: glass header, bento, micro-motion ═══ */
+::selection{background:var(--candle-soft);color:var(--ink)}
+.g-site-head{position:sticky;top:0;z-index:50;background:rgba(250,231,192,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:box-shadow .25s}
+.g-site-head.g-is-scrolled{box-shadow:0 1px 0 rgba(59,59,59,.07),0 10px 26px -20px rgba(59,59,59,.35)}
+.g-overline{display:flex;align-items:center;gap:.55rem}
+.g-overline::before{content:"";width:26px;height:3px;border-radius:2px;background:var(--candle-soft)}
+.g-stepgrid{counter-reset:gstep}
+.g-stepgrid li{counter-increment:gstep;position:relative;overflow:hidden;border-radius:20px;box-shadow:0 1px 2px rgba(59,59,59,.05),0 14px 34px -20px rgba(59,59,59,.18)}
+.g-stepgrid li::after{content:counter(gstep);position:absolute;top:auto;right:.35rem;bottom:-1.15rem;font:700 4.4rem/1 var(--serif);color:var(--ink);opacity:.08;pointer-events:none}
+.g-stepgrid li:nth-child(2){background:var(--ink);border-color:var(--ink)}
+.g-stepgrid li:nth-child(2) h3{color:#FFF6E3}
+.g-stepgrid li:nth-child(2) p{color:#CFC6B4}
+.g-stepgrid li:nth-child(2) .g-stepico{background:rgba(250,231,192,.14);color:#F2CE86}
+.g-stepgrid li:nth-child(2)::after{color:#FAE7C0;opacity:.14}
+.g-stepgrid li:nth-child(3){background:var(--green-tint);border-color:#D9ECDD}
+.g-stepgrid li:nth-child(3) .g-stepico{background:#FFFFFF}
+.g-stepgrid li:nth-child(4){background:var(--butter-deep);border-color:#EBCF8C}
+.g-stepgrid li:nth-child(4) .g-stepico{background:rgba(255,255,255,.65)}
+@media (max-width:560px){.g-stepgrid li::after{font-size:3.4rem;bottom:-.85rem}}
+.g-phone{position:relative;box-shadow:0 2px 4px rgba(59,59,59,.08),0 28px 60px -24px rgba(59,59,59,.35),0 0 54px rgba(232,161,60,.22)}
+@media (min-width:700px){.g-phone{transform:rotate(-1.4deg)}}
+.g-phone-chip{position:absolute;top:1.9rem;left:-1.1rem;z-index:2;display:inline-flex;align-items:center;gap:.4rem;background:#fff;color:var(--green-ink);font:600 .78rem/1 var(--sans);padding:.5rem .75rem;border-radius:999px;box-shadow:0 8px 22px -10px rgba(59,59,59,.35);transform:rotate(2deg)}
+@media (max-width:560px){.g-phone-chip{left:-.4rem;top:1.6rem}}
+.g-stage,.g-dash-empty{box-shadow:0 1px 2px rgba(59,59,59,.05),0 16px 38px -26px rgba(59,59,59,.22)}
+.g-nevergrid{max-width:none;grid-template-columns:1fr}
+@media (min-width:640px){.g-nevergrid{grid-template-columns:1fr 1fr;max-width:40rem}}
+@media (hover:hover) and (pointer:fine){
+  .g-btn{transition:transform .18s ease,box-shadow .18s ease}
+  .g-btn:hover{transform:translateY(-1px);box-shadow:0 12px 22px -14px rgba(59,59,59,.5)}
+  .g-stepgrid li,.g-stage{transition:transform .22s ease,box-shadow .22s ease}
+  .g-stepgrid li:hover,.g-stage:hover{transform:translateY(-2px)}
+}
+.g-anim .g-reveal{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+.g-anim .g-reveal.g-in{opacity:1;transform:none}
+
+/* swash, stat band, bento (composes with the layer above) */
+.g-h1-teal{position:relative;display:inline-block;background-image:none;padding-bottom:0}
+.g-swash{position:absolute;left:0;bottom:-.14em;width:100%;height:.3em;pointer-events:none}
+.g-stat{background:var(--ink);color:#D8CFBC;padding:2.5rem 0 2.7rem}
+.g-stat-big{font-family:var(--serif);font-weight:700;font-size:clamp(1.7rem,3.2vw + .8rem,2.7rem);line-height:1.15;color:var(--linen);margin:0 0 .6rem;letter-spacing:-.02em;max-width:17ch}
+.g-stat-line{margin:0;max-width:27rem;font-size:1.05rem}
+.g-stat-src{margin:.7rem 0 0;font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;opacity:.55}
+.g-band{margin-inline:clamp(.6rem,2.5vw,1.8rem);border-radius:28px;border:1px solid #F2E4BE}
+@media (min-width:880px){
+  .g-wide{max-width:60rem}
+  .g-bento{display:grid;grid-template-columns:1fr 1fr minmax(20rem,23.5rem);gap:1rem;align-items:start}
+  .g-bento .g-stepgrid{display:contents}
+  .g-bento .g-phone{grid-column:3;grid-row:1 / 3;margin:0}
+}
+
+/* floating pill dock */
+.g-bottomnav{inset-inline:14px;bottom:calc(10px + env(safe-area-inset-bottom));padding:.35rem .5rem;border:1px solid rgba(59,59,59,.09);border-radius:24px;box-shadow:0 12px 32px -6px rgba(59,59,59,.22);background:rgba(255,249,235,.94)}
+
+/* live status dots on chips */
+.g-chip{display:inline-flex;align-items:center;gap:.38rem}
+.g-chip::before{content:"";width:.48em;height:.48em;border-radius:50%;background:currentColor;opacity:.75;flex:none}
+
+/* dock positioning fix: transform-free centering that no cascade quirk can shift */
+.g-bottomnav{inset-inline:0;left:auto;right:auto;transform:none;margin-inline:auto;width:min(430px,calc(100% - 1.5rem))}
 </style>
 </head>
 <body>
@@ -578,12 +727,12 @@ input[type="tel"]{border-radius:12px}
         <circle cx="1116" cy="470" r="12"/>
       </g>
       <path d="M1060 300v-8" stroke="#3B3B3B" stroke-opacity=".4" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="1060" cy="276" r="24" fill="#E8A13C" fill-opacity=".14"/>
-      <path d="M1060 262c8.5 10.5 8.5 23 0 31c-8.5-8-8.5-20.5 0-31Z" fill="#E8A13C" fill-opacity=".28" stroke="#C97F1E" stroke-opacity=".6" stroke-width="1.8"/>
+      <circle class="g-halo" cx="1060" cy="276" r="24" fill="#E8A13C" fill-opacity=".14"/>
+      <path class="g-flame" d="M1060 262c8.5 10.5 8.5 23 0 31c-8.5-8-8.5-20.5 0-31Z" fill="#E8A13C" fill-opacity=".28" stroke="#C97F1E" stroke-opacity=".6" stroke-width="1.8"/>
       <path d="M1060 272c3.6 4.6 3.6 10.4 0 14.6" stroke="#C97F1E" stroke-opacity=".55" stroke-width="1.6" fill="none" stroke-linecap="round"/>
     </svg>
     <div class="g-wrap">
-      <h1 id="hero-h" tabindex="-1">Grace calls the funeral homes. <span class="g-h1-teal">So you don’t have to.</span></h1>
+      <h1 id="hero-h" tabindex="-1">Grace calls the funeral homes. <span class="g-h1-teal">So you don’t have to.<svg class="g-swash" viewBox="0 0 260 14" preserveAspectRatio="none" aria-hidden="true"><path d="M4 10C64 3 150 2 256 6" stroke="#E8A13C" stroke-width="5.5" fill="none" stroke-linecap="round"/></svg></span></h1>
       <p class="g-lede">Tell her your family’s needs — language, timing, budget. She brings back matched options, prices side by side.</p>
       <div class="g-cta-row">
         <button type="button" class="g-btn g-btn-fill" id="heroCall" data-mode="call" aria-haspopup="dialog">
@@ -600,31 +749,42 @@ input[type="tel"]{border-radius:12px}
   </section>
 
 
+  <section class="g-stat g-v-home" aria-label="Why this matters">
+    <div class="g-wrap">
+      <p class="g-stat-big">Same funeral, half the price.</p>
+      <p class="g-stat-line">The exact same service can cost half as much, depending on who you call. Grace finds out before your family commits.</p>
+      <p class="g-stat-src">Source: Consumer Federation of America</p>
+    </div>
+  </section>
+
   <!-- ——— Section 2 · How it works ——— -->
   <section class="g-section g-v-home g-band" aria-labelledby="how-h">
-    <div class="g-wrap">
+    <div class="g-wrap g-wide">
       <p class="g-overline">How Grace works</p>
       <h2 id="how-h">Four simple steps</h2>
+      <div class="g-bento">
             <ol class="g-stepgrid">
-        <li>
+        <li class="g-reveal" data-n="1">
           <span class="g-stepico" aria-hidden="true"><svg width="24" height="24"><use href="#i-text"/></svg></span>
           <h3>You talk</h3><p>A call or text, in your own words.</p>
         </li>
-        <li>
+        <li class="g-reveal" data-n="2">
           <span class="g-stepico" aria-hidden="true"><svg width="24" height="24"><use href="#i-call"/></svg></span>
           <h3>She searches for you</h3><p>Grace calls the funeral homes that fit your needs.</p>
         </li>
-        <li>
+        <li class="g-reveal" data-n="3">
           <span class="g-stepico" aria-hidden="true"><svg width="24" height="24"><use href="#i-compare"/></svg></span>
           <h3>Matched options, side by side</h3><p>Real quotes — missing fees flagged.</p>
         </li>
-        <li>
+        <li class="g-reveal" data-n="4">
           <span class="g-stepico" aria-hidden="true"><svg width="24" height="24"><use href="#i-check"/></svg></span>
           <h3>Your family decides</h3><p>Grace never books or signs.</p>
         </li>
       </ol>
 
-      <div class="g-phone"><figure class="g-example">
+      <div class="g-phone g-reveal">
+        <span class="g-phone-chip" aria-hidden="true"><svg width="15" height="15"><use href="#i-check"/></svg> 3 calls complete</span>
+        <figure class="g-example">
             <figcaption>Example · matched to your family</figcaption>
             <div class="g-quote g-quote-pick">
               <span class="g-pick">Grace’s pick</span>
@@ -652,6 +812,7 @@ input[type="tel"]{border-radius:12px}
             </div>
             <p class="g-example-foot">Grace explains her pick. Your family still chooses what matters.</p>
           </figure></div>
+      </div><!-- /g-bento -->
     </div>
   </section>
 
@@ -699,7 +860,7 @@ input[type="tel"]{border-radius:12px}
         </div>
 
         <ol class="g-tl" aria-label="Where things stand, step by step">
-          <li class="g-stage g-is-live">
+          <li class="g-reveal g-stage g-is-live">
             <div class="g-stage-head">
               <span class="g-stage-n" aria-hidden="true">1</span>
               <h4>Your requirements</h4>
@@ -723,7 +884,7 @@ input[type="tel"]{border-radius:12px}
             </div>
           </li>
 
-          <li class="g-stage g-is-live">
+          <li class="g-reveal g-stage g-is-live">
             <div class="g-stage-head">
               <span class="g-stage-n" aria-hidden="true">2</span>
               <h4>Calls to funeral homes</h4>
@@ -770,7 +931,7 @@ input[type="tel"]{border-radius:12px}
             </div>
           </li>
 
-          <li class="g-stage g-is-live" aria-current="step">
+          <li class="g-reveal g-stage g-is-live" aria-current="step">
             <div class="g-stage-head">
               <span class="g-stage-n" aria-hidden="true">3</span>
               <h4>Negotiating the price</h4>
@@ -787,7 +948,7 @@ input[type="tel"]{border-radius:12px}
             </div>
           </li>
 
-          <li class="g-stage g-is-next">
+          <li class="g-reveal g-stage g-is-next">
             <div class="g-stage-head">
               <span class="g-stage-n" aria-hidden="true">4</span>
               <h4>Paying the funeral home</h4>
@@ -819,38 +980,38 @@ input[type="tel"]{border-radius:12px}
       <p class="g-overline">The line she won’t cross</p>
       <h2 id="trust-h">What Grace will never do</h2>
             <ul class="g-nevergrid">
-        <li><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Book or sign anything</strong></li>
-        <li><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Push you on price</strong></li>
-        <li><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Sell your information</strong></li>
-        <li><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Guess — unknowns get flagged</strong></li>
-        <li><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Replace the professionals you trust</strong></li>
+        <li class="g-reveal"><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Book or sign anything</strong></li>
+        <li class="g-reveal"><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Push you on price</strong></li>
+        <li class="g-reveal"><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Sell your information</strong></li>
+        <li class="g-reveal"><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Guess — unknowns get flagged</strong></li>
+        <li class="g-reveal"><span class="g-nevico" aria-hidden="true"><svg width="20" height="20"><use href="#i-never"/></svg></span><strong>Replace the professionals you trust</strong></li>
       </ul>
 
       <div class="g-faq">
         <h3 id="faq-h">Questions families ask</h3>
-        <details>
+        <details class="g-reveal">
           <summary>What happens on the first call?</summary>
           <p>A calm conversation, not a script. Grace asks what your family needs, repeats it back — and nothing is shared until you approve it.</p>
         </details>
-        <details>
+        <details class="g-reveal">
           <summary>We’re on a deadline. Can Grace keep up?</summary>
           <p>Yes — mention the deadline first. Grace prioritizes homes that can meet it, and is honest when a timeline looks tight.</p>
         </details>
-        <details>
+        <details class="g-reveal">
           <summary>Do we have to talk about money?</summary>
           <p>Only as much as you want. Grace gathers itemized prices for clarity — you’ll never be asked to name a budget.</p>
         </details>
-        <details>
+        <details class="g-reveal">
           <summary>Who sees our information?</summary>
           <p>Only the funeral homes you approve, only the details you’ve confirmed. Ask anytime what’s been shared, or reply STOP to any text to end contact.</p>
         </details>
-        <details>
+        <details class="g-reveal">
           <summary>What does talking to Grace cost?</summary>
           <p>Nothing. Funeral homes don’t pay Grace and she takes no commissions.</p>
         </details>
       </div>
 
-      <div class="g-end-cta">
+      <div class="g-end-cta g-reveal">
         <p>Ready when you are.</p>
         <div class="g-cta-row">
           <button type="button" class="g-btn g-btn-fill" data-mode="call" aria-haspopup="dialog">
@@ -1329,6 +1490,21 @@ input[type="tel"]{border-radius:12px}
     });
   });
 
+  /* Delegated fallback: some hosts re-render DOM nodes after load, which
+     silently strips the per-element listeners above. A document-level
+     listener survives that. preventDefault() in the direct handlers
+     dedupes: if they already ran, this no-ops. */
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented) { return; }
+    var t = e.target && e.target.closest ? e.target.closest("[data-route],[data-mode]") : null;
+    if (!t) { return; }
+    e.preventDefault();
+    var r = t.getAttribute("data-route");
+    if (r) { go(r); return; }
+    if (!sheetRoot.hidden) { return; }
+    openSheet(t.getAttribute("data-mode"));
+  });
+
   function fromHash(silent) {
     var h = window.location.hash;
     if (h === "#arrangements") { go("progress", { silent: silent, keepHash: true }); }
@@ -1343,8 +1519,37 @@ input[type="tel"]{border-radius:12px}
     });
   }
 
+  /* modern layer: header elevation + gentle scroll reveals */
+  window.addEventListener("scroll", function () {
+    siteHead.classList.toggle("g-is-scrolled", window.scrollY > 6);
+  }, { passive: true });
+  if (!reduced && "IntersectionObserver" in window) {
+    document.documentElement.classList.add("g-anim");
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("g-in"); io.unobserve(e.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.1 });
+    Array.prototype.forEach.call(document.querySelectorAll(".g-reveal"), function (el) { io.observe(el); });
+  }
+
   window.addEventListener("hashchange", function () { fromHash(false); });
   fromHash(true);
+
+  /* ——— scroll-reveal: progressive and motion-safe ——— */
+  if (!reduced && "IntersectionObserver" in window) {
+    var revEls = document.querySelectorAll(".g-stepgrid li,.g-nevergrid li,.g-phone,.g-faq details,.g-stage,.g-end-cta");
+    var io2 = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { en.target.classList.add("g-in"); io2.unobserve(en.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    Array.prototype.forEach.call(revEls, function (el, i) {
+      el.classList.add("g-prep");
+      el.style.transitionDelay = (i % 5) * 55 + "ms";
+      io2.observe(el);
+    });
+  }
 })();
 </script>
 </body>

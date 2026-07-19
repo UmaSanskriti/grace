@@ -100,7 +100,15 @@ node qa.js --no-hashchange                # sandboxed-host simulation
 node qa.js --hash='#arrangements-live'    # texted-link entry
 ```
 
-18 behavioural assertions: routing, master-component conformance (all CTAs identical, zero anchors), dialog flow, dashboard toggles.
+Behavioural assertions (jsdom): routing, master-component conformance (all CTAs identical, zero anchors), dialog flow, dashboard toggles, delegated-listener resilience.
+
+**Rendered QA** (real Chromium — layout, hit-testing, genuine mouse clicks at 390/560/1200px):
+
+```bash
+node realqa.mjs
+```
+
+Run this tier before shipping any CSS change that touches positioned or fixed elements; jsdom cannot catch layout regressions (e.g., a nav control rendered off-screen).
 
 ## Deploy
 

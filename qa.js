@@ -72,6 +72,17 @@ if (startUrl) {
   $('dashHide').click();
   ok(!vis($('dashLive')) && vis($('dashEmpty')), 'hide restores empty state');
 
+  // regression: routing must survive hosts that strip element listeners (re-rendered DOM)
+  const dock = $('bottomNav');
+  const clone = dock.cloneNode(true);          // clone has NO listeners
+  dock.parentNode.replaceChild(clone, dock);
+  clone.querySelector('[data-route="progress"]').click();
+  ok(vis($('progress')), 'delegated routing works with stripped listeners');
+  clone.querySelector('[data-route="home"]').click();
+  ok(vis(d.querySelector('.g-hero')), 'delegated Home works with stripped listeners');
+
+  // regression: sheet close must fully clean up (overlay, aria, scroll lock)
+  d.querySelector('#dashEmpty') && d.querySelector('.g-bn-item[data-route="progress"], [data-route="progress"]');
   // contact sheet opens from the dashboard CTA
   d.querySelector('#dashEmpty [data-mode="text"]').click();
   ok(!$('sheetRoot').hidden, 'dashboard CTA opens contact sheet');
