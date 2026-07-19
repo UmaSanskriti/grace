@@ -18,7 +18,10 @@ const ANON = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? "
 type NodeState = "idle" | "active" | "done";
 interface ActNode { id: string; label: string; kind: string; state: string; activity: string; output: string }
 interface Activity {
-  case: { case_id: string; status: string; progress: number; preferred_channel: string; current_version: number };
+  case: {
+    case_id: string; status: string; progress: number;
+    preferred_channel: string; current_version: number; aborted?: boolean;
+  };
   active_node: string | null;
   nodes: ActNode[];
   calls: {
@@ -28,7 +31,12 @@ interface Activity {
     conversation_id?: string | null;
   }[];
   events: { type: string; actor: string; timestamp: string }[];
-  summary: { quotes: number; audited: number; audit_flags: number; is_tie: boolean | null; recommended: string | null };
+  summary: {
+    quotes: number; audited: number; audit_flags: number;
+    is_tie: boolean | null; recommended: string | null;
+    // Number of providers this case actually has (one per DEMO_TARGETS entry).
+    providers?: number;
+  };
 }
 interface CaseRow { case_id: string; status: string; current_version: number; created_at: string }
 
@@ -154,17 +162,19 @@ const PIPELINE: StepDef[] = [
     }),
   },
   {
-    n: 5, id: "caller", title: "Grace Caller Agent ×3", sub: "same brief to every provider",
+    n: 5, id: "caller", title: "Grace Caller Agent", sub: "same brief to every provider",
     kind: "voice", color: "#0d9488", Icon: PhoneCall,
     derive: (d) => { const x = nodeById(d, "caller"); return { state: asState(x?.state), activity: x?.activity ?? "Idle", output: x?.output ?? "—" }; },
   },
   {
-    n: 6, id: "homes", title: "Three Demo Funeral Homes", sub: "Transparent · Package-first · Hidden-fee",
+    n: 6, id: "homes", title: "Demo Funeral Homes", sub: "role-play providers",
     kind: "tool", color: "#4338ca", Icon: Building2,
     derive: (d) => ({
       state: d.case.progress >= 6 && d.case.progress <= 8 ? "active" : d.case.progress >= 9 ? "done" : "idle",
       activity: d.case.progress >= 9 ? "All outcomes captured" : d.case.progress >= 6 ? "Answering itemized questions" : "Standby",
-      output: `${d.summary.quotes}/3 quote outcomes`,
+      // Provider count comes from the case (one per DEMO_TARGETS entry), not a
+      // hardcoded 3 — that assumed main's three-roleplayer spec.
+      output: `${d.summary.quotes}/${d.summary.providers ?? d.summary.quotes} quote outcomes`,
     }),
   },
   {
@@ -226,40 +236,6 @@ const SHARED: StepDef[] = [
   },
 ];
 
-// ---- Simulation: step a synthetic case through the loop for demos ----
-function simulate(progress: number): Activity {
-  const STATES = ["NEW","CONSENTED","PREFERENCE_SMS_SENT","INTAKE_AGENT_ACTIVE","CASE_DRAFT","CASE_CONFIRMED",
-    "CALLER_BATCH_QUEUED","CALLER_AGENT_ACTIVE","QUOTE_CAPTURED","QUOTES_NORMALIZED_AND_AUDITED","CLOSER_READY",
-    "CLOSER_NEGOTIATION_ACTIVE","QUOTE_REVISED","REPORT_READY","CLOSER_CONSUMER_CALL_ACTIVE","CONSUMER_UPDATED","CLOSED"];
-  const status = STATES[Math.min(progress, STATES.length - 1)];
-  const quotes = progress >= 8 ? 3 : progress >= 7 ? 2 : progress >= 6 ? 1 : 0;
-  const mk = (id: string, state: string, activity: string, output: string): ActNode =>
-    ({ id, label: id, kind: "tool", state, activity, output });
-  const A = (lo: number, hi: number) => (progress >= lo && progress <= hi ? "active" : progress > hi ? "done" : "idle");
-  return {
-    case: { case_id: "SIMULATION", status, progress, preferred_channel: "voice", current_version: progress >= 5 ? 4 : 0 },
-    active_node: null,
-    nodes: [
-      mk("intake", progress >= 3 && progress <= 4 ? "active" : progress >= 5 ? "done" : "idle",
-        progress >= 3 && progress <= 4 ? "On call — running voice intake" : progress >= 5 ? "CaseSpec confirmed" : "Idle",
-        progress >= 5 ? "CaseSpec v4 confirmed" : "—"),
-      mk("caller", A(6, 8), progress >= 6 && progress <= 8 ? "3 live provider calls" : progress >= 9 ? "outcomes captured" : "Idle", `${quotes}/3 quotes`),
-      mk("normalizer", A(8, 8), "Structuring transcripts", progress >= 9 ? "3 normalized" : "—"),
-      mk("auditor", A(8, 8), "Flagging hidden fees", progress >= 9 ? "2 flags" : "—"),
-      mk("ranker", progress === 9 || progress === 12 ? "active" : progress >= 13 ? "done" : "idle", "Scoring fit/cost/certainty", progress >= 13 ? "recommend demo_transparent" : "—"),
-      mk("closer", progress === 11 || progress === 14 ? "active" : progress >= 15 ? "done" : "idle",
-        progress === 11 ? "Negotiating with verified leverage" : progress === 14 ? "Explaining ranked result" : progress >= 15 ? "Consumer updated" : "Ready",
-        progress === 12 ? "revised terms logged" : "—"),
-      mk("research", A(4, 6), "Loading cached fixtures", progress >= 4 ? "fixtures cached" : "—"),
-      mk("ledger", "active", "Regenerating evidence.md", `${progress} events`),
-    ],
-    calls: progress >= 6 && progress <= 8 ? [{ purpose: "initial_quote", provider_id: "demo_hidden_fee", status: "active" }] : [],
-    events: [],
-    summary: { quotes, audited: progress >= 9 ? 3 : 0, audit_flags: progress >= 9 ? 2 : 0,
-      is_tie: false, recommended: progress >= 13 ? "demo_transparent" : null },
-  };
-}
-
 const KIND_LABEL: Record<Kind, string> = {
   human: "PERSON", telephony: "TELEPHONY", voice: "LIVE VOICE AGENT",
   checkpoint: "CHECKPOINT", tool: "BACKEND TOOL",
@@ -274,7 +250,10 @@ function Node({ def, d, big }: { def: StepDef; d: Activity; big?: boolean }) {
     <div
       className="grace-node relative flex flex-col rounded-2xl border bg-white p-3 transition-all duration-500"
       style={{
-        width: big ? 220 : 172, minHeight: big ? 168 : 150,
+        // Wider than the original 220/172: node titles like "Grace Caller Agent"
+        // were being ellipsed. Titles now wrap rather than truncate, so the
+        // extra height covers a two-line title.
+        width: big ? 244 : 196, minHeight: big ? 178 : 162,
         borderColor: active ? color : done ? "#cfe3d8" : "#e2e4e0",
         boxShadow: active ? `0 0 0 3px ${color}22, 0 10px 30px -8px ${color}66` : "0 1px 2px #0000000a",
         opacity: state === "idle" ? 0.62 : 1,
@@ -298,7 +277,7 @@ function Node({ def, d, big }: { def: StepDef; d: Activity; big?: boolean }) {
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold leading-tight" style={{ color: "#1f2937" }}>{def.title}</div>
+          <div className="text-[13px] font-semibold leading-tight" style={{ color: "#1f2937" }}>{def.title}</div>
           <div className="text-[10px] font-semibold tracking-wide" style={{ color }}>{KIND_LABEL[def.kind]}</div>
         </div>
       </div>
@@ -339,9 +318,7 @@ export default function AgentLoop() {
   const [caseId, setCaseId] = useState<string>("");
   const [data, setData] = useState<Activity | null>(null);
   const [err, setErr] = useState<string>("");
-  const [sim, setSim] = useState(false);
-  const simProg = useRef(0);
-  const [, force] = useState(0);
+  const [aborting, setAborting] = useState(false);
 
   // Case ids we have already seen, so a genuinely new one can be told apart
   // from the list simply reloading. Seeded on the first poll.
@@ -366,10 +343,7 @@ export default function AgentLoop() {
           }
           const fresh = r.cases.find((c) => !seenCases.current!.has(c.case_id));
           r.cases.forEach((c) => seenCases.current!.add(c.case_id));
-          if (fresh) {
-            setCaseId(fresh.case_id);
-            setSim(false); // a real case beats the simulation
-          }
+          if (fresh) setCaseId(fresh.case_id);
         })
         .catch((e) => { if (alive) setErr(String(e)); });
     };
@@ -378,33 +352,37 @@ export default function AgentLoop() {
     return () => { alive = false; clearInterval(t); };
   }, []);
 
-  // Poll the selected case live (unless simulating).
+  // Poll the selected case live.
   const poll = useCallback(() => {
-    if (sim || !caseId) return;
+    if (!caseId) return;
     get<Activity>(`/agent-activity?case_id=${encodeURIComponent(caseId)}`)
       .then((r) => { setData(r); setErr(""); })
       .catch((e) => setErr(String(e)));
-  }, [sim, caseId]);
+  }, [caseId]);
 
   useEffect(() => {
-    if (sim) return;
     poll();
     const t = setInterval(poll, 1600);
     return () => clearInterval(t);
-  }, [poll, sim]);
+  }, [poll]);
 
-  // Simulation ticker.
-  useEffect(() => {
-    if (!sim) return;
-    simProg.current = 0;
-    const t = setInterval(() => {
-      simProg.current = (simProg.current + 1) % 17;
-      setData(simulate(simProg.current));
-      force((n) => n + 1);
-    }, 1500);
-    setData(simulate(0));
-    return () => clearInterval(t);
-  }, [sim]);
+  // Kill switch. Stops the NEXT call — a call already ringing still completes
+  // and still lands its transcript.
+  const abortCase = useCallback(async () => {
+    if (!caseId) return;
+    setAborting(true);
+    try {
+      const res = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/abort`, {
+        method: "POST", headers: authHeaders,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      poll();
+    } catch (e) {
+      setErr(`Abort failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setAborting(false);
+    }
+  }, [caseId, poll]);
 
   const view = data;
 
@@ -456,12 +434,10 @@ export default function AgentLoop() {
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-grace-border bg-white p-3">
         <label className="text-xs font-semibold text-grace-muted">Case</label>
         <select
-          value={sim ? "SIM" : caseId}
-          disabled={sim}
+          value={caseId}
           onChange={(e) => setCaseId(e.target.value)}
           className="min-w-[19rem] rounded-md border border-grace-border bg-white px-2 py-1 text-sm"
         >
-          {sim && <option value="SIM">SIMULATION</option>}
           {cases.map((c) => (
             // Full id: ours are readable (case_YYYYMMDD_NNN), not UUIDs, so the
             // old slice(0, 8) cut every one of them down to "case_202".
@@ -476,16 +452,23 @@ export default function AgentLoop() {
             {view.case.status}
           </span>
         )}
+        {view?.case.aborted && (
+          <span className="rounded-full bg-grace-dangerSoft px-2.5 py-1 text-xs font-bold text-grace-danger">
+            ⛔ STOPPED — no further calls
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-3">
           <span className="flex items-center gap-1 text-xs text-grace-muted">
-            <span className={`h-2 w-2 rounded-full ${sim ? "bg-amber-500" : "bg-emerald-500"} grace-blink`} />
-            {sim ? "SIMULATION" : "live · polling 1.6s"}
+            <span className="h-2 w-2 rounded-full bg-emerald-500 grace-blink" />
+            live · polling 1.6s
           </span>
           <button
-            onClick={() => setSim((s) => !s)}
-            className="rounded-md border border-grace-border px-3 py-1.5 text-sm font-medium hover:bg-grace-accentSoft"
+            onClick={abortCase}
+            disabled={!caseId || aborting || Boolean(view?.case.aborted)}
+            title="Stop this case placing any further calls. A call already ringing still finishes."
+            className="rounded-md border border-grace-danger bg-grace-dangerSoft px-3 py-1.5 text-sm font-semibold text-grace-danger hover:brightness-95 disabled:opacity-40"
           >
-            {sim ? "Stop simulation" : "▶ Simulate loop"}
+            {view?.case.aborted ? "Stopped" : aborting ? "Stopping…" : "⛔ Stop agents"}
           </button>
         </div>
       </div>
@@ -502,7 +485,7 @@ export default function AgentLoop() {
 
       {err && !view && (
         <div className="rounded-lg border border-grace-dangerSoft bg-grace-dangerSoft p-3 text-sm text-grace-danger">
-          Couldn’t load live activity ({err}). Pick a case or hit “Simulate loop”.
+          Couldn’t load live activity ({err}). Pick a case, or wait for the next one to arrive.
         </div>
       )}
 

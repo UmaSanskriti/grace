@@ -180,6 +180,12 @@ def _summary(case: dict) -> dict:
         best = min(priced, key=lambda q: q["quoted_price_usd"])
         recommended = best.get("funeral_home_name") or best.get("funeral_home_id")
 
+    # How many providers this case actually has, so the UI can stop hardcoding
+    # "/3" — that came from main's spec, which assumed three roleplayers. We
+    # build one per DEMO_TARGETS entry, so the real number varies.
+    homes = case.get("funeral_homes") or []
+    home_list = homes.get("homes", []) if isinstance(homes, dict) else homes
+
     return {
         "quotes": len(quotes),
         "audited": len(priced),
@@ -187,6 +193,7 @@ def _summary(case: dict) -> dict:
         "audit_flags": sum(1 for q in quotes if q.get("quoted_price_usd") is None),
         "is_tie": None,
         "recommended": recommended,
+        "providers": len(home_list),
     }
 
 
@@ -300,6 +307,7 @@ def agent_activity(case_id: str | None = None) -> dict:
             # This pipeline is voice-first; SMS intake is not implemented.
             "preferred_channel": "voice",
             "current_version": 1,
+            "aborted": bool(case.get("aborted")),
         },
         "active_node": _active_node(nodes),
         "nodes": nodes,

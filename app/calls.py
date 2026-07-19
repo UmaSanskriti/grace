@@ -71,6 +71,10 @@ def start_next_quote_call(case_id: str) -> dict:
     Skips (marking unreachable) homes with no phone, or — in DEMO_MODE — any
     phone not in DEMO_TARGETS, continuing until a call is placed or none remain.
     """
+    if storage.is_aborted(case_id):
+        log.info("quote call suppressed — case=%s aborted", case_id)
+        return {"aborted": True}
+
     case = storage.read_case(case_id)
     if not case or case.get("status") != "calling_for_quotes":
         return {"skipped": f"status is {case.get('status') if case else None!r}"}
@@ -115,6 +119,11 @@ def start_next_quote_call(case_id: str) -> dict:
     # Nothing left to call.
     storage.set_status(case_id, "quotes_collected")
     log.info("all quotes collected case=%s", case_id)
+    # Re-check: the abort may have landed while the last quote call was in
+    # flight, and set_status above would have cleared a status-based flag.
+    if storage.is_aborted(case_id):
+        log.info("cascade to strategy/negotiation suppressed — case=%s aborted", case_id)
+        return {"aborted": True}
     if settings.auto_advance:
         # Continue: build strategy, then start negotiation calls.
         from . import strategy  # lazy import to avoid a cycle
@@ -284,6 +293,10 @@ def _nego_dynamic_vars(case_id: str, home: dict, quote: dict, hs: dict, user_inf
 
 def start_next_nego_call(case_id: str) -> dict:
     """Place a negotiation call to the next shortlisted home, or finish + report."""
+    if storage.is_aborted(case_id):
+        log.info("negotiation call suppressed — case=%s aborted", case_id)
+        return {"aborted": True}
+
     case = storage.read_case(case_id)
     if not case or case.get("status") not in ("strategy_ready", "negotiating"):
         return {"skipped": f"status is {case.get('status') if case else None!r}"}

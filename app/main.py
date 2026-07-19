@@ -201,6 +201,9 @@ def _pipeline_after_intake(case_id: str) -> None:
     The quote call (and everything downstream) only auto-fires when AUTO_ADVANCE
     is on; otherwise the case rests at calling_for_quotes for a manual /advance.
     """
+    if storage.is_aborted(case_id):
+        log.info("post-intake pipeline suppressed — case=%s aborted", case_id)
+        return
     res = research.run_research(case_id)
     if res.get("ok") and settings.auto_advance:
         calls.start_next_quote_call(case_id)
@@ -258,6 +261,31 @@ def get_report(case_id: str) -> Response:
     return Response(path.read_text(), media_type="text/markdown")
 
 
+@app.post("/cases/{case_id}/abort")
+def abort_case(case_id: str) -> dict:
+    """Kill switch — stop this case placing any further calls.
+
+    Does not change status (the dashboard would lose the pipeline position) and
+    cannot cancel a call already ringing; it stops the *next* one. An in-flight
+    call still lands its webhook, and its transcript is still saved.
+    """
+    if storage.read_case(case_id) is None:
+        raise HTTPException(404, f"unknown case {case_id}")
+    storage.set_aborted(case_id, True)
+    log.warning("case %s ABORTED — no further calls will be placed", case_id)
+    return {"case_id": case_id, "aborted": True}
+
+
+@app.post("/cases/{case_id}/resume")
+def resume_case(case_id: str) -> dict:
+    """Clear the abort flag. Does not restart the pipeline — use /advance."""
+    if storage.read_case(case_id) is None:
+        raise HTTPException(404, f"unknown case {case_id}")
+    storage.set_aborted(case_id, False)
+    log.info("case %s resumed (abort cleared)", case_id)
+    return {"case_id": case_id, "aborted": False}
+
+
 @app.post("/cases/{case_id}/advance")
 def advance_case(case_id: str) -> dict:
     """Manual pipeline nudge (debug/demo safety valve).
@@ -269,6 +297,8 @@ def advance_case(case_id: str) -> dict:
     case = storage.read_case(case_id)
     if case is None:
         raise HTTPException(404, f"unknown case {case_id}")
+    if storage.is_aborted(case_id):
+        raise HTTPException(409, f"case {case_id} is aborted — POST /resume first")
     status = case.get("status")
 
     if status in ("intake_done", "researching", "research_failed"):

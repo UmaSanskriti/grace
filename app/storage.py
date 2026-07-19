@@ -110,6 +110,24 @@ def set_status(case_id: str, status: str) -> None:
     _write_json(case_dir(case_id) / "case.json", case)
 
 
+def set_aborted(case_id: str, aborted: bool = True) -> None:
+    """Kill switch: stop the pipeline placing any further calls on this case.
+
+    Deliberately a separate field rather than a status value. The cascade writes
+    statuses as it goes (`quotes_collected` when the last quote lands, then
+    strategy -> negotiation), so an "aborted" status would be overwritten by an
+    in-flight webhook and the calls would resume.
+    """
+    case = ensure_case(case_id)
+    case["aborted"] = aborted
+    case["updated_at"] = _now_iso()
+    _write_json(case_dir(case_id) / "case.json", case)
+
+
+def is_aborted(case_id: str) -> bool:
+    return bool((read_case(case_id) or {}).get("aborted"))
+
+
 def set_user_phone(case_id: str, phone: str) -> None:
     """Record the user's phone number on the case (for later SMS updates)."""
     case = ensure_case(case_id)
