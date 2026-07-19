@@ -66,7 +66,12 @@ def _best_home(case_id: str) -> tuple[str, object]:
             continue
         fh_id = q.get("funeral_home_id") or ""
         nego = negos.get(fh_id, {})
-        price = nego.get("final_price_usd")
+        # `_validate_final_price` (extraction.py) only type-checks final_price_usd;
+        # it never enforces the extraction prompt's "if nothing was agreed, use
+        # null" rule. So an unagreed negotiation can still carry a non-null
+        # final_price_usd, and without this gate we'd read it out to the family
+        # as the confirmed price. Only trust it when agreed is explicitly True.
+        price = nego.get("final_price_usd") if nego.get("agreed") is True else None
         if price is None:
             price = q.get("quoted_price_usd")
         if not isinstance(price, (int, float)):
@@ -114,4 +119,11 @@ def summarize_for_speech(case_id: str, md: str) -> tuple[str, str]:
         log.error("speech summary empty case=%s — using fallback", case_id)
     except Exception as e:  # LLM down / model unavailable — still make the call
         log.error("speech summary failed case=%s: %s — using fallback", case_id, e)
-    return _fallback_summary(case_id), "fallback"
+    try:
+        return _fallback_summary(case_id), "fallback"
+    except Exception as e:  # corrupt/unreadable JSON under quotes/ or negotiations/
+        log.error("fallback summary failed case=%s: %s — using hardcoded fallback", case_id, e)
+        return (
+            "We have finished calling funeral homes for you, and your written "
+            "report is ready."
+        ), "fallback"

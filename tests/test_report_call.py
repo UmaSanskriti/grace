@@ -87,9 +87,57 @@ def test_summary() -> None:
     check("3" in summary, f"fallback omits the number of homes called: {summary!r}")
 
 
+def test_unagreed_negotiation_ignored() -> None:
+    """agreed: false with a non-null final_price_usd must not win as the best price.
+
+    _validate_final_price (extraction.py) only type-checks the field; it never
+    enforces the extraction prompt's "if nothing was agreed, use null" rule. So
+    this record shape is reachable, and _best_home must not trust it.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        d = Path(td) / case_id
+        # Oak Hill's negotiation didn't actually land, but final_price_usd is
+        # (wrongly) populated anyway — this must be ignored in favor of the
+        # home's quoted_price_usd (4200), not trusted as the confirmed price.
+        storage._write_json(d / "negotiations" / "fh_001.json", {
+            "funeral_home_id": "fh_001", "funeral_home_name": "Oak Hill",
+            "agreed": False, "final_price_usd": 1,
+        })
+
+        name, price = report_call._best_home(case_id)
+        check(price != 1, f"unagreed final_price_usd of 1 was trusted: {price!r}")
+        check(name == "Oak Hill", f"expected cheapest home Oak Hill, got {name!r}")
+        check(price == 4200, f"expected Oak Hill's quoted 4200, not the unagreed figure, got {price!r}")
+
+
+def test_corrupt_quote_file_never_raises() -> None:
+    """A corrupt JSON file under quotes/ must not escape summarize_for_speech.
+
+    storage._read_json is a bare json.loads with no error handling, and
+    _fallback_summary reaches it via _best_home/_homes_called. The function's
+    contract is that it never raises and never returns an empty string, so the
+    fallback path must be guarded independently of the LLM try/except.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td))
+        d = Path(td) / case_id
+        (d / "quotes" / "fh_001.json").write_text("{not valid json")
+
+        try:
+            summary, source = report_call.summarize_for_speech(case_id, "# report")
+        except Exception as e:
+            check(False, f"summarize_for_speech raised on corrupt quote JSON: {e!r}")
+        else:
+            check(source == "fallback", f"expected fallback source, got {source!r}")
+            check(summary.strip() != "", "summary is empty despite corrupt JSON on disk")
+
+
 def main() -> int:
     report_call.OpenAI = _BoomOpenAI
     test_summary()
+    test_unagreed_negotiation_ignored()
+    test_corrupt_quote_file_never_raises()
 
     if failures:
         for f in failures:
