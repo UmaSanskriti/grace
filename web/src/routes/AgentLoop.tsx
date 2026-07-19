@@ -27,12 +27,85 @@ interface Activity {
 }
 interface CaseRow { case_id: string; status: string; current_version: number; created_at: string }
 
+const authHeaders: Record<string, string> = ANON ? { apikey: ANON, Authorization: `Bearer ${ANON}` } : {};
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: ANON ? { apikey: ANON, Authorization: `Bearer ${ANON}` } : {},
-  });
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json() as Promise<T>;
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+  return data as T;
+}
+
+interface LaunchedCall { label: string; conversation_id: string; provider_id?: string }
+
+// Polls /call-transcript for one conversation and renders the turns once the
+// call is done (or in progress). All calls are real; transcript shown for the
+// consented demo (INV-07). React escapes text on render — no injection.
+function CallTranscript({ call }: { call: LaunchedCall }) {
+  const [status, setStatus] = useState("pending");
+  const [turns, setTurns] = useState<{ role: string; message: string }[]>([]);
+  const [dur, setDur] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await get<{ status: string; transcript: { role: string; message: string }[]; duration_secs: number | null }>(
+          `/call-transcript?conversation_id=${encodeURIComponent(call.conversation_id)}`,
+        );
+        if (!alive) return;
+        setStatus(r.status); setTurns(r.transcript); setDur(r.duration_secs);
+      } catch { /* keep polling */ }
+    };
+    tick();
+    const t = setInterval(tick, 3000);
+    return () => { alive = false; clearInterval(t); };
+  }, [call.conversation_id]);
+
+  const done = status === "done" || status === "failed";
+  const live = status === "in-progress" || status === "processing";
+  return (
+    <div className="rounded-xl border border-grace-border bg-white p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-semibold text-grace-ink">{call.label}</div>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+          done ? "bg-emerald-100 text-emerald-800" : live ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"
+        }`}>
+          {live ? "● on call" : done ? `✓ ${status}${dur ? ` · ${dur}s` : ""}` : status}
+        </span>
+      </div>
+      {turns.length === 0 ? (
+        <div className="text-[11px] text-grace-muted">
+          {live ? "Call in progress — transcript will appear as it's spoken…" : "Waiting for transcript…"}
+        </div>
+      ) : (
+        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+          {turns.map((t, i) => (
+            <div key={i} className={`flex ${t.role === "grace" ? "justify-start" : "justify-end"}`}>
+              <div className={`max-w-[85%] rounded-2xl px-3 py-1.5 text-[12px] leading-snug ${
+                t.role === "grace" ? "bg-teal-50 text-teal-900" : "bg-blue-50 text-blue-900"
+              }`}>
+                <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wide opacity-60">
+                  {t.role === "grace" ? "Grace" : "Caller"}
+                </div>
+                {t.message}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---- Visual model: 9-step pipeline + 4-box shared layer (matches diagram) ----
@@ -273,6 +346,39 @@ export default function AgentLoop() {
   const simProg = useRef(0);
   const [, force] = useState(0);
 
+  // "Run it live" controls.
+  const [consumerNum, setConsumerNum] = useState("+16172330662");
+  const [houseNum, setHouseNum] = useState("+16507327964");
+  const [providerId, setProviderId] = useState("demo_transparent");
+  const [launching, setLaunching] = useState("");
+  const [launchMsg, setLaunchMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [launched, setLaunched] = useState<LaunchedCall[]>([]);
+
+  const callConsumer = async () => {
+    setLaunching("intake"); setLaunchMsg(null);
+    try {
+      const r = await post<{ case_id: string; conversation_id: string | null; status: string }>(
+        "/demo-call", { kind: "intake", to: consumerNum });
+      setCaseId(r.case_id); setSim(false);
+      if (r.conversation_id) setLaunched((p) => [{ label: `Grace Intake → consumer ${consumerNum.slice(-4)}`, conversation_id: r.conversation_id! }, ...p]);
+      setLaunchMsg({ ok: true, text: `Intake call ringing ${consumerNum}. Pick up!` });
+    } catch (e) { setLaunchMsg({ ok: false, text: String(e instanceof Error ? e.message : e) }); }
+    finally { setLaunching(""); }
+  };
+
+  const callHouse = async () => {
+    if (!caseId) { setLaunchMsg({ ok: false, text: "Run the consumer intake call first (it creates the case)." }); return; }
+    setLaunching("caller"); setLaunchMsg(null);
+    try {
+      const r = await post<{ case_id: string; provider_id: string; conversation_id: string | null; status: string }>(
+        "/demo-call", { kind: "caller", to: houseNum, provider_id: providerId, case_id: caseId });
+      setSim(false);
+      if (r.conversation_id) setLaunched((p) => [{ label: `Grace Caller → ${r.provider_id} (${houseNum.slice(-4)})`, conversation_id: r.conversation_id!, provider_id: r.provider_id }, ...p]);
+      setLaunchMsg({ ok: true, text: `Caller call ringing ${houseNum} as ${providerId}. Answer as the funeral home!` });
+    } catch (e) { setLaunchMsg({ ok: false, text: String(e instanceof Error ? e.message : e) }); }
+    finally { setLaunching(""); }
+  };
+
   // Load recent cases once.
   useEffect(() => {
     get<{ cases: CaseRow[] }>("/agent-activity")
@@ -372,6 +478,52 @@ export default function AgentLoop() {
         </div>
       </div>
 
+      {/* Run it live: place the real calls */}
+      <div className="rounded-xl border-2 border-teal-200 bg-teal-50/50 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <PhoneCall className="h-4 w-4 text-teal-700" />
+          <span className="text-sm font-bold text-teal-900">Run it live — place the real calls</span>
+          <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-semibold text-teal-800">1 consumer + 1 funeral house</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-grace-border bg-white p-3">
+            <div className="mb-1 text-xs font-semibold text-grace-muted">1 · Consumer (Grace Intake Agent calls them)</div>
+            <input value={consumerNum} onChange={(e) => setConsumerNum(e.target.value)}
+              className="mb-2 w-full rounded-md border border-grace-border px-2 py-1 font-mono text-sm" />
+            <button onClick={callConsumer} disabled={launching !== ""}
+              className="w-full rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">
+              {launching === "intake" ? "Dialing…" : "📞 Call consumer (Intake)"}
+            </button>
+          </div>
+          <div className="rounded-lg border border-grace-border bg-white p-3">
+            <div className="mb-1 text-xs font-semibold text-grace-muted">2 · Funeral house (Grace Caller Agent calls them)</div>
+            <div className="mb-2 flex gap-2">
+              <input value={houseNum} onChange={(e) => setHouseNum(e.target.value)}
+                className="w-full rounded-md border border-grace-border px-2 py-1 font-mono text-sm" />
+              <select value={providerId} onChange={(e) => setProviderId(e.target.value)}
+                className="rounded-md border border-grace-border px-2 py-1 text-sm">
+                <option value="demo_transparent">Transparent (A)</option>
+                <option value="demo_package_first">Package-first (B)</option>
+                <option value="demo_hidden_fee">Hidden-fee (C)</option>
+              </select>
+            </div>
+            <button onClick={callHouse} disabled={launching !== "" || !caseId}
+              className="w-full rounded-md bg-indigo-700 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-50">
+              {launching === "caller" ? "Dialing…" : "📞 Call funeral house (Caller)"}
+            </button>
+            {!caseId && <div className="mt-1 text-[10px] text-grace-muted">Run the consumer call first (creates the case).</div>}
+          </div>
+        </div>
+        {launchMsg && (
+          <div className={`mt-3 rounded-md px-3 py-2 text-sm ${launchMsg.ok ? "bg-emerald-50 text-emerald-800" : "bg-grace-dangerSoft text-grace-danger"}`}>
+            {launchMsg.text}
+          </div>
+        )}
+        <div className="mt-2 text-[11px] text-grace-muted">
+          Both numbers must be allowlisted + consented. You’ll roleplay the funeral home when the Caller rings. 2 more numbers later → full 3-provider run.
+        </div>
+      </div>
+
       {err && !view && (
         <div className="rounded-lg border border-grace-dangerSoft bg-grace-dangerSoft p-3 text-sm text-grace-danger">
           Couldn’t load live activity ({err}). Pick a case or hit “Simulate loop”.
@@ -421,6 +573,16 @@ export default function AgentLoop() {
               </div>
             </div>
           </div>
+
+          {/* Call transcripts (real calls) */}
+          {launched.length > 0 && (
+            <div className="space-y-3">
+              <div className="text-sm font-bold" style={{ color: "#12213f" }}>Call transcripts</div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {launched.map((c) => <CallTranscript key={c.conversation_id} call={c} />)}
+              </div>
+            </div>
+          )}
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-4 text-[11px] text-grace-muted">
