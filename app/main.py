@@ -189,6 +189,13 @@ async def elevenlabs_webhook(request: Request, background: BackgroundTasks) -> d
             calls.handle_nego_result,
             case_id, fh_id, parsed.conversation_id, parsed.transcript_text,
         )
+    elif agent_type == "report":
+        # Terminal. The case was set `done` when this call was placed, and the
+        # transcript is already saved above — there is nothing to advance.
+        log.info(
+            "report call finished case=%s conversation_id=%s",
+            case_id, parsed.conversation_id,
+        )
     else:
         log.info("no handler for agent=%s yet (transcript saved)", agent_type)
 

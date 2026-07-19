@@ -292,7 +292,7 @@ def _nego_dynamic_vars(case_id: str, home: dict, quote: dict, hs: dict, user_inf
 
 
 def start_next_nego_call(case_id: str) -> dict:
-    """Place a negotiation call to the next shortlisted home, or finish + report."""
+    """Place a negotiation call to the next shortlisted home, or finish: report + deliver."""
     if storage.is_aborted(case_id):
         log.info("negotiation call suppressed — case=%s aborted", case_id)
         return {"aborted": True}
@@ -345,12 +345,13 @@ def start_next_nego_call(case_id: str) -> dict:
         )
         return {"placed": fh_id, "conversation_id": conv}
 
-    # Shortlist exhausted -> produce the final report.
-    from . import report  # lazy import to avoid a cycle
-    report.generate_report(case_id)
+    # Shortlist exhausted -> produce the final report, then read it to the family.
+    from . import report, report_call  # lazy imports to avoid a cycle
+    md = report.generate_report(case_id)
+    rc = report_call.deliver_report(case_id, md)
     storage.set_status(case_id, "done")
-    log.info("negotiations complete case=%s -> done", case_id)
-    return {"done": True, "status": "done"}
+    log.info("negotiations complete case=%s report_call=%s -> done", case_id, rc["status"])
+    return {"done": True, "status": "done", "report_call": rc}
 
 
 def handle_nego_result(case_id: str, fh_id: str | None, conversation_id: str, transcript: str) -> None:

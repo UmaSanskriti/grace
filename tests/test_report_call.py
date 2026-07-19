@@ -318,6 +318,30 @@ def test_index_conversation_failure_still_placed() -> None:
     check(saved == r, f"report_call.json disagrees with the return value: {saved!r}")
 
 
+def test_pipeline_reaches_done() -> None:
+    """A failing report call must not strand the case before `done`."""
+    from app import calls, report
+
+    settings.elevenlabs_report_agent_id = "agent_report_1"
+    settings.demo_mode = False
+    report_call.outbound_call = _Recorder(exc=report_call.ElevenLabsError("503"))
+
+    with tempfile.TemporaryDirectory() as td:
+        case_id = _seed(Path(td), status="negotiating")
+        # An empty shortlist means the loop falls straight through to reporting.
+        storage._write_json(Path(td) / case_id / "strategy.json",
+                            {"shortlist": [], "per_home_strategy": []})
+        # generate_report would call OpenAI; its own fallback is tested elsewhere.
+        report.generate_report = lambda cid: "# Grace — Funeral Quote Report\n"
+
+        result = calls.start_next_nego_call(case_id)
+        case = storage.read_case(case_id)
+
+    check(case["status"] == "done", f"case stranded at {case['status']!r} by a failed call")
+    check(result.get("report_call", {}).get("status") == "failed",
+          f"report_call outcome not surfaced in the return value: {result!r}")
+
+
 def main() -> int:
     report_call.OpenAI = _BoomOpenAI
     test_summary()
@@ -326,6 +350,7 @@ def main() -> int:
     test_happy_path()
     test_guards()
     test_failures_never_raise()
+    test_pipeline_reaches_done()
     test_save_json_failure_never_raises()
     test_index_conversation_failure_still_placed()
 
