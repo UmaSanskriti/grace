@@ -530,6 +530,22 @@ export default function AgentLoop() {
             </div>
           </div>
 
+          {/* Call transcripts — every call on this case, including the
+              consumer's own inbound intake. Driven by the case record rather
+              than by manual launches, so an inbound demo still shows them.
+              Sits directly under the pipeline: the conversation is what people
+              watch, and it should not need a scroll past the evidence layer. */}
+          {transcriptCalls.length > 0 && (
+            <div className="space-y-3">
+              <div className="text-sm font-bold" style={{ color: "#12213f" }}>Call transcripts</div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {transcriptCalls.map((c) => (
+                  <CallTranscript key={c.conversation_id} call={c} onTurns={noteTurns} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Shared layer */}
           <div className="rounded-2xl border border-dashed border-grace-border bg-grace-bg/60 p-4">
             <div className="mb-3 text-center text-xs font-bold uppercase tracking-wider text-grace-muted">
@@ -559,20 +575,6 @@ export default function AgentLoop() {
               </div>
             </div>
           </div>
-
-          {/* Call transcripts — every call on this case, including the
-              consumer's own inbound intake. Driven by the case record rather
-              than by manual launches, so an inbound demo still shows them. */}
-          {transcriptCalls.length > 0 && (
-            <div className="space-y-3">
-              <div className="text-sm font-bold" style={{ color: "#12213f" }}>Call transcripts</div>
-              <div className="grid gap-3 lg:grid-cols-2">
-                {transcriptCalls.map((c) => (
-                  <CallTranscript key={c.conversation_id} call={c} onTurns={noteTurns} />
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-4 text-[11px] text-grace-muted">
