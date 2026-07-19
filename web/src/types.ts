@@ -1,10 +1,26 @@
 // =====================================================================
-// Grace web — types MIRRORED from supabase/functions/_shared/types.ts
-// (§ CONTRACTS.md) Runtimes are kept separate: we do NOT import across the
-// Deno / Node boundary. Keep this in sync with the canonical contract file.
+// Grace web — frontend types, owned here.
+//
+// These used to be mirrored from the Deno/Supabase Edge Functions' shared
+// types. That track is gone (issue #12); the backend is the FastAPI app under
+// `app/`, and this file is now the frontend's own contract against it.
+//
+// Two groups live here, and the split matters:
+//
+//   1. LIVE — types matching what `app/web_api.py` actually returns today.
+//      See the "Backend responses" section at the bottom of this file.
+//   2. LEGACY — the domain model below (CaseSpec, QuoteResult, RankedReport,
+//      …) came from the Deno spec. No FastAPI route serves these shapes; they
+//      are still referenced by Enroll.tsx / CaseDashboard.tsx, which are not
+//      wired to a working endpoint. Kept so those screens keep compiling, but
+//      do NOT treat them as a description of the live backend.
 // =====================================================================
 
-// ---------- State machine (§3.3) ----------
+// ---------- LEGACY: Deno-era state machine ----------
+// NOT the backend's status vocabulary. `app/` uses: orphan_webhook,
+// awaiting_intake, active, intake_extract_failed, intake_done, researching,
+// research_failed, calling_for_quotes, quotes_collected, strategy_ready,
+// negotiating, done. See BackendCaseStatus below.
 export type CaseStatus =
   | "NEW"
   | "CONSENTED"
@@ -255,10 +271,10 @@ export interface CloserContext {
   last_material_events: EventSummary[];
 }
 
-// ---------- Case context wrapper returned by GET /cases/{id}/context ----------
-// The spec keeps the exact shape agent-specific; the dashboard reads a
-// superset that includes the confirmed CaseSpec, quotes, comparison and the
-// rendered Markdown ledger for display.
+// ---------- LEGACY: case context wrapper ----------
+// NOT served by the FastAPI backend. `GET /cases/{id}` returns the raw case
+// dump from storage.dump_case (case_id, status, user_info, funeral_homes,
+// quotes, negotiations, strategy, transcripts) — a different shape entirely.
 export interface CaseContextResponse {
   case_id: string;
   status: CaseStatus;
@@ -274,7 +290,8 @@ export interface CaseContextResponse {
   updated_at: string | null;
 }
 
-// ---------- GET /cases/{id}/report ----------
+// ---------- LEGACY: ranked-report wrapper ----------
+// NOT served as JSON. `GET /cases/{id}/report` returns text/markdown.
 export interface CaseReportResponse {
   case_id: string;
   status: CaseStatus;
@@ -282,7 +299,10 @@ export interface CaseReportResponse {
   report_markdown: string | null;
 }
 
-// ---------- POST /demo/enroll ----------
+// ---------- LEGACY: enrollment ----------
+// NOT served by the FastAPI backend — it has no enrollment route at all. The
+// live demo is voice-first: the family dials in and the webhook creates the
+// case. Enroll.tsx still posts this and will fail against `app/`.
 export interface EnrollRequest {
   phone_e164: string;
   scope: string;
@@ -299,4 +319,117 @@ export interface EnrollResponse {
   status: CaseStatus;
   preferred_channel: PreferredChannel;
   first_sms_preview?: string;
+}
+
+// =====================================================================
+// LIVE — backend responses, reconciled against app/web_api.py.
+// These describe what the FastAPI backend actually returns today. AgentLoop
+// currently declares equivalents inline; folding it onto these is follow-up
+// (that file is being restructured in parallel).
+// =====================================================================
+
+/** Case statuses the backend actually writes (app/web_api.py `_PROGRESS`). */
+export type BackendCaseStatus =
+  | "orphan_webhook"
+  | "awaiting_intake"
+  | "active"
+  | "intake_extract_failed"
+  | "intake_done"
+  | "researching"
+  | "research_failed"
+  | "calling_for_quotes"
+  | "quotes_collected"
+  | "strategy_ready"
+  | "negotiating"
+  | "done";
+
+export type ActivityNodeState = "idle" | "active" | "done";
+
+/** One of the eight pipeline nodes from `_build_nodes`. */
+export interface ActivityNode {
+  id: string;
+  label: string;
+  kind: "voice" | "tool";
+  state: ActivityNodeState;
+  activity: string;
+  output: string;
+}
+
+/** An entry of `_calls`. `conversation_id` is null for a home never dialed. */
+export interface ActivityCall {
+  purpose: "intake" | "initial_quote" | "negotiation";
+  provider_id: string | null;
+  status: string;
+  conversation_id: string | null;
+}
+
+/** An entry of `_events`. Note: no `summary` field — unlike EventSummary. */
+export interface ActivityEvent {
+  type: string;
+  actor: string;
+  timestamp: string;
+}
+
+export interface ActivitySummary {
+  quotes: number;
+  audited: number;
+  audit_flags: number;
+  /** Always null today: the backend has no tie detection. */
+  is_tie: boolean | null;
+  recommended: string | null;
+  providers: number;
+}
+
+/** GET /agent-activity?case_id= */
+export interface AgentActivityResponse {
+  case: {
+    case_id: string;
+    status: BackendCaseStatus | "unknown";
+    /** 0..16 ordinal inherited from the Deno state machine (issue #16). */
+    progress: number;
+    preferred_channel: "voice";
+    current_version: number;
+    aborted: boolean;
+  };
+  active_node: string | null;
+  nodes: ActivityNode[];
+  calls: ActivityCall[];
+  events: ActivityEvent[];
+  summary: ActivitySummary;
+}
+
+/** GET /agent-activity (no case_id) — the case picker. */
+export interface AgentActivityCaseListResponse {
+  cases: {
+    case_id: string;
+    status: BackendCaseStatus | "unknown";
+    current_version: number;
+    created_at: string;
+  }[];
+}
+
+/** GET /call-transcript?conversation_id= */
+export interface CallTranscriptResponse {
+  /** ElevenLabs status, or "pending" before the conversation is queryable. */
+  status: string;
+  transcript: {
+    role: "caller" | "grace";
+    message: string;
+    secs: number | null;
+  }[];
+  duration_secs: number | null;
+}
+
+/** POST /demo-call */
+export interface DemoCallRequest {
+  kind: "intake" | "caller" | "closer";
+  to: string;
+  case_id?: string | null;
+  provider_id?: string | null;
+}
+
+export interface DemoCallResponse {
+  case_id: string;
+  conversation_id: string;
+  call_sid: string | null;
 }

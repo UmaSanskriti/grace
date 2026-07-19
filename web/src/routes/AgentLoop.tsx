@@ -13,7 +13,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const BASE = (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.replace(/\/+$/, "") ?? "";
-const ANON = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? "";
 
 type NodeState = "idle" | "active" | "done";
 interface ActNode { id: string; label: string; kind: string; state: string; activity: string; output: string }
@@ -40,10 +39,8 @@ interface Activity {
 }
 interface CaseRow { case_id: string; status: string; current_version: number; created_at: string }
 
-const authHeaders: Record<string, string> = ANON ? { apikey: ANON, Authorization: `Bearer ${ANON}` } : {};
-
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: authHeaders });
+  const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -374,7 +371,7 @@ export default function AgentLoop() {
     setAborting(true);
     try {
       const res = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}/${action}`, {
-        method: "POST", headers: authHeaders,
+        method: "POST",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       poll();
