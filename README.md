@@ -78,10 +78,14 @@ Set `DEMO_TARGETS` in `.env` to a comma-separated list of E.164 numbers you're a
 To text the user pipeline-progress updates, set these Twilio credentials in `.env` (from
 [console.twilio.com](https://console.twilio.com)):
 
+Auth uses an **API key** (Twilio recommends this over the account Auth Token, which grants full
+account access). Create one at Console → Account → **API keys & tokens**.
+
 | Var | What it is |
 |---|---|
-| `TWILIO_ACCOUNT_SID` | Account SID (starts with `AC…`) |
-| `TWILIO_AUTH_TOKEN` | Auth Token from the same console page |
+| `TWILIO_ACCOUNT_SID` | Account SID (starts with `AC…`) — needed to build the request URL |
+| `TWILIO_API_KEY_SID` | API key SID (starts with `SK…`) — the request username |
+| `TWILIO_API_KEY_SECRET` | API key secret — the request password (shown once at key creation) |
 | `TWILIO_SMS_FROM` | an **SMS-capable** Twilio number in E.164 to send from (e.g. `+14155550123`) |
 
 These are separate from the ElevenLabs API key. The user's number is captured automatically from the
