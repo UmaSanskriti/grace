@@ -164,12 +164,19 @@ evaluation criteria).
 
 | Method & path | Purpose |
 |---|---|
+| `GET /` | consumer landing page (needs `GRACE_PHONE_NUMBER`, else `503`) |
 | `GET /health` | liveness + config check |
 | `POST /debug/call` | place a test outbound call |
 | `POST /webhooks/elevenlabs` | single post-call webhook entrypoint |
 | `GET /cases/{id}` | dump full case state (demo UI) |
 | `GET /cases/{id}/report` | return `report.md` (Slice 6) |
 | `POST /cases/{id}/advance` | manual pipeline nudge (Slice 2+) |
+
+## Deploy to a remote box
+
+See [docs/deploy-remote.md](docs/deploy-remote.md) — full walkthrough for the Akash Ubuntu
+container demo box, including the container-specific gotchas (no systemd, `:8000` not port-mapped,
+ngrok's one-endpoint-per-account limit) and what the tunnel leaves publicly exposed.
 
 ## Compliance
 
