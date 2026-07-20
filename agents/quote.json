@@ -30,7 +30,7 @@
   },
   "tts": {
     "model_id": "eleven_v3_conversational",
-    "voice_id": "cjVigY5qzO86Huf0OWal",
+    "voice_id": "PBjLN8WJmwHEGB1u1UzI",
     "supported_voices": [],
     "expressive_mode": true,
     "suggested_audio_tags": [
