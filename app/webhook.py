@@ -168,12 +168,22 @@ def _coerce_duration(value: object) -> int | None:
 
 
 def _coerce_error(value: object) -> str:
-    """metadata.error as a message string. Observed as None on healthy calls;
-    the shape on a failure is undocumented, so accept anything truthy."""
+    """metadata.error as a message string. None on healthy calls; on a real
+    failure it is a dict, observed as:
+
+        {"code": 1008, "reason": "Missing required dynamic variables in tools: {'case_id'}"}
+
+    `reason` carries the human-readable half, so prefer it — falling through to
+    str(dict) buries the diagnosis in an escaped repr. `message` is kept as an
+    alternative key because the shape is not documented and may vary."""
     if not value:
         return ""
     if isinstance(value, dict):
-        return str(value.get("message") or value)
+        text = value.get("reason") or value.get("message")
+        code = value.get("code")
+        if text:
+            return f"[{code}] {text}" if code is not None else str(text)
+        return str(value)
     return str(value)
 
 

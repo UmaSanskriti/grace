@@ -175,6 +175,52 @@ def test_unknown_signals_fail_open() -> None:
           f"absent duration treated as truncation: {p.failure_reason!r}")
 
 
+def test_initialization_failure_is_caught_even_when_status_lies() -> None:
+    """The decisive real-world case, from 33 saved payloads across 26 cases.
+
+    Eleven of them failed with termination_reason "Conversation initialization
+    failed" — the agent never got its dynamic variables, so nothing was said.
+    Only TWO of those eleven report status="failed"/call_successful="failure".
+    The other NINE report status="done" and call_successful="success": the
+    outcome enums say the call went fine when it did not.
+
+    So the enums alone would have let 9 of 11 real failures through into
+    extraction. What actually catches them is the independent truncation
+    check — every one ran 0-3s and produced 0-1 turns. This test exists to stop
+    anyone "simplifying" that check away as redundant with the enums.
+    """
+    lying = _payload(
+        status="done",              # says fine
+        call_successful="success",  # says fine
+        termination_reason="Conversation initialization failed",
+        error={
+            "code": 1008,
+            "reason": "Missing required dynamic variables in tools: {'case_id'}",
+        },
+        duration=1,
+        turns=1,
+    )
+    p = webhook.parse_webhook(lying)
+    check(p.failure_reason is not None,
+          "initialization failure passed as healthy because status/enum lied")
+
+    # The 1008 reason is the actual diagnosis; burying it in an escaped dict
+    # repr is what makes this class of outage hard to spot in the logs.
+    check("case_id" in p.call_error,
+          f"error detail lost — reason not surfaced: {p.call_error!r}")
+    check("1008" in p.call_error,
+          f"error code lost: {p.call_error!r}")
+
+    # And the zero-duration variant seen in the same corpus.
+    q = webhook.parse_webhook(_payload(
+        status="done", call_successful="success",
+        termination_reason="Conversation initialization failed",
+        duration=0, turns=0,
+    ))
+    check(q.failure_reason is not None,
+          "0s / 0-turn initialization failure passed as healthy")
+
+
 def test_failure_reason_never_raises() -> None:
     """Whatever the payload, deciding the verdict must not throw — this runs
     inside the webhook handler, and an exception there is a 5xx that makes
