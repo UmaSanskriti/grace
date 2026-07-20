@@ -8,6 +8,7 @@ The webhook handler already dispatches on agent_type so the Slice 2+ pipeline
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +37,53 @@ app.add_middleware(
 # Adapter routes the React dashboard polls (/agent-activity, /call-transcript,
 # /demo-call). Kept in their own module so the pipeline surface stays untouched.
 app.include_router(web_api.router)
+
+# --- consumer landing page -------------------------------------------------
+# The family-facing surface, ported from the other track (main @ 8b1fddc). One
+# self-contained file — no external fonts, scripts, or images — so a single
+# route serves it. Deliberately *not* a StaticFiles mount at "/": a mount would
+# sit in front of every unmatched path and turn API typos into HTML 404s.
+#
+# The CTA is a plain `tel:` link to GRACE_PHONE_NUMBER, so the page needs no
+# backend of its own: the family dials Grace, the intake agent answers, and the
+# inbound webhook below picks the call up from there. The original outbound
+# flow it replaced (collect number -> Grace calls you) was a setTimeout that
+# faked success with no POST behind it.
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _landing_html() -> str:
+    """Render the landing page.
+
+    Read per request, not cached: uvicorn --reload restarts on .py edits but
+    not .html ones, so a cache means edits to the page silently don't show up
+    while someone is iterating on it. It's a 140KB read and two replaces.
+    """
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    return html.replace("{{GRACE_PHONE}}", settings.grace_phone_number).replace(
+        "{{GRACE_PHONE_DISPLAY}}", settings.grace_phone_display
+    )
+
+
+@app.get("/", include_in_schema=False)
+def landing() -> Response:
+    """Serve the consumer landing page.
+
+    Refuses to serve without GRACE_PHONE_NUMBER. The whole page is one CTA;
+    rendering it with an empty tel: link would show a family a "Call Grace"
+    button that silently does nothing at the worst moment of their week.
+    """
+    if not settings.grace_phone_number.strip():
+        log.error("GRACE_PHONE_NUMBER is not set — refusing to serve the landing page")
+        raise HTTPException(
+            503, "GRACE_PHONE_NUMBER is not configured (see .env.sample)"
+        )
+    try:
+        return Response(_landing_html(), media_type="text/html")
+    except OSError as e:
+        log.error("landing page unreadable: %s", e)
+        raise HTTPException(404, "landing page not installed")
 
 
 @app.get("/health")
