@@ -21,8 +21,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.config import settings  # noqa: E402
+from app.config import Settings, settings  # noqa: E402
 from app.main import app  # noqa: E402
+
+# GRACE_PHONE_NUMBER has no default (a real number in source is how a stale one
+# ships), so the tests supply their own rather than depending on the developer's
+# .env. Restored in main() so nothing leaks into another test module.
+TEST_NUMBER = "+16505550123"
+TEST_DISPLAY = "+1 (650) 555-0123"
+_real_number = settings.grace_phone_number
+settings.grace_phone_number = TEST_NUMBER
 
 client = TestClient(app)
 failures: list[str] = []
@@ -65,11 +73,35 @@ def test_landing_does_not_shadow_the_api() -> None:
 def test_cta_dials_the_configured_number() -> None:
     """The button and the printed number must both reach GRACE_PHONE_NUMBER."""
     body = client.get("/").text
-    href = f'href="tel:{settings.grace_phone_number}"'
+    href = f'href="tel:{TEST_NUMBER}"'
     check(href in body, f"no CTA dials the configured number ({href})")
+    check(TEST_DISPLAY in body, f"the number is never shown as text ({TEST_DISPLAY})")
     check(
-        settings.grace_phone_display in body,
-        f"the number is never shown as text ({settings.grace_phone_display})",
+        "+16507725745" not in body,
+        "a hardcoded number survives in the page — it must come from config",
+    )
+
+
+def test_unset_number_is_refused_not_rendered() -> None:
+    """No GRACE_PHONE_NUMBER must 503, not serve a button that dials nothing."""
+    settings.grace_phone_number = ""
+    try:
+        r = client.get("/")
+        check(r.status_code == 503, f"unset number served {r.status_code}, want 503")
+        check(
+            "GRACE_PHONE_NUMBER" in r.text,
+            "the 503 does not name the missing setting",
+        )
+        check('href="tel:"' not in r.text, "served an empty tel: link")
+    finally:
+        settings.grace_phone_number = TEST_NUMBER
+
+
+def test_number_has_no_default_in_source() -> None:
+    """A real number as a code default is how a stale one ships to families."""
+    check(
+        Settings(_env_file=None).grace_phone_number == "",
+        "grace_phone_number has a default — it must come from the environment",
     )
 
 
@@ -103,11 +135,8 @@ def test_footer_does_not_claim_calls_are_simulated() -> None:
 
 def test_display_number_formatting() -> None:
     """US numbers are prettied; anything else passes through untouched."""
-    from app.config import Settings
-
     check(
-        Settings(grace_phone_number="+16507725745").grace_phone_display
-        == "+1 (650) 772-5745",
+        Settings(grace_phone_number=TEST_NUMBER).grace_phone_display == TEST_DISPLAY,
         "US E.164 not formatted for display",
     )
     for odd in ("+442071838750", "not-a-number", ""):
@@ -125,7 +154,11 @@ def main() -> int:
     test_no_unrendered_placeholders()
     test_no_dead_contact_flow()
     test_footer_does_not_claim_calls_are_simulated()
+    test_unset_number_is_refused_not_rendered()
+    test_number_has_no_default_in_source()
     test_display_number_formatting()
+
+    settings.grace_phone_number = _real_number
 
     if failures:
         for f in failures:

@@ -55,8 +55,10 @@ class Settings(BaseSettings):
     # --- Consumer landing page ---
     # The number families dial to reach Grace's intake agent. Rendered into the
     # landing page's "Call Grace" link, so it must be the *inbound* number the
-    # intake agent answers, not the outbound caller ID.
-    grace_phone_number: str = "+16507725745"
+    # intake agent answers, not the outbound caller ID. No default: a wrong
+    # number here sends grieving families to a stranger, and a stale default
+    # baked into the source is exactly how that happens.
+    grace_phone_number: str = ""
 
     @property
     def grace_phone_display(self) -> str:

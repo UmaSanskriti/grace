@@ -68,7 +68,17 @@ def _landing_html() -> str:
 
 @app.get("/", include_in_schema=False)
 def landing() -> Response:
-    """Serve the consumer landing page."""
+    """Serve the consumer landing page.
+
+    Refuses to serve without GRACE_PHONE_NUMBER. The whole page is one CTA;
+    rendering it with an empty tel: link would show a family a "Call Grace"
+    button that silently does nothing at the worst moment of their week.
+    """
+    if not settings.grace_phone_number.strip():
+        log.error("GRACE_PHONE_NUMBER is not set — refusing to serve the landing page")
+        raise HTTPException(
+            503, "GRACE_PHONE_NUMBER is not configured (see .env.sample)"
+        )
     try:
         return Response(_landing_html(), media_type="text/html")
     except OSError as e:
