@@ -52,6 +52,21 @@ class Settings(BaseSettings):
     # --- Orchestrator ---
     base_url: str = ""  # ngrok URL in dev, Railway URL in prod
 
+    # --- Consumer landing page ---
+    # The number families dial to reach Grace's intake agent. Rendered into the
+    # landing page's "Call Grace" link, so it must be the *inbound* number the
+    # intake agent answers, not the outbound caller ID.
+    grace_phone_number: str = "+16507725745"
+
+    @property
+    def grace_phone_display(self) -> str:
+        """US E.164 as +1 (650) 772-5745. Anything else is shown verbatim."""
+        n = self.grace_phone_number.strip()
+        digits = n.lstrip("+")
+        if n.startswith("+1") and len(digits) == 11 and digits.isdigit():
+            return f"+1 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+        return n
+
     # --- Demo ---
     demo_mode: bool = False
     demo_targets: str = ""  # comma-separated E.164 numbers
