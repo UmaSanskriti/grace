@@ -12,7 +12,16 @@ import {
 // live VOICE agents and the non-calling BACKEND tool "agents" are shown.
 // ---------------------------------------------------------------------------
 
-const BASE = (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.replace(/\/+$/, "") ?? "";
+// Same-origin by default, treating a blank value as unset — see the note on
+// resolveBaseUrl in lib/api.ts.
+const CONFIGURED_BASE = (
+  import.meta.env.VITE_APP_BASE_URL as string | undefined
+)?.trim();
+const BASE = CONFIGURED_BASE
+  ? CONFIGURED_BASE.replace(/\/+$/, "")
+  : typeof window !== "undefined"
+    ? window.location.origin
+    : "";
 const ANON = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? "";
 
 type NodeState = "idle" | "active" | "done";

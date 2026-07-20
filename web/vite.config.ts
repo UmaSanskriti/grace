@@ -4,6 +4,10 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Served under /admin by the FastAPI backend, because "/" is the consumer
+  // landing page. Asset URLs in the built index.html are prefixed with this;
+  // the router's basename in main.tsx has to agree with it.
+  base: "/admin/",
   plugins: [react()],
   resolve: {
     alias: {

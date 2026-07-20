@@ -10,11 +10,26 @@ import type {
   EnrollResponse,
 } from "../types";
 
-const BASE_URL: string =
-  (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.replace(
-    /\/+$/,
-    ""
-  ) ?? "";
+// Defaults to the origin the dashboard was served from. When the FastAPI
+// backend serves both this bundle and the API, that is always correct and
+// needs no rebuild if the public URL changes. VITE_APP_BASE_URL still wins,
+// for the Vite dev server pointing at a backend on another origin.
+//
+// Do not hardcode a tunnel URL here: an absolute cross-origin base makes every
+// request preflight, and behind ngrok's free tier they land on its browser
+// interstitial instead of the API, which surfaces as "Failed to fetch".
+function resolveBaseUrl(): string {
+  const configured = (
+    import.meta.env.VITE_APP_BASE_URL as string | undefined
+  )?.trim();
+  // Empty counts as unset: a blank VITE_APP_BASE_URL= line in web/.env is not
+  // nullish, so `??` would keep "" and every request would go to a relative
+  // path with no origin.
+  if (configured) return configured.replace(/\/+$/, "");
+  return typeof window !== "undefined" ? window.location.origin : "";
+}
+
+const BASE_URL: string = resolveBaseUrl();
 
 const ANON_KEY: string =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? "";
