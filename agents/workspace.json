@@ -1,0 +1,29 @@
+{
+  "convai_settings": {
+    "can_use_mcp_servers": false,
+    "code_tool_allowed_domains": [],
+    "conversation_embedding_retention_days": null,
+    "conversation_initiation_client_data_webhook": null,
+    "default_livekit_stack": "standard",
+    "rag_retention_period_days": 10,
+    "webhooks": {
+      "events": [
+        "transcript"
+      ],
+      "post_call_webhook_id": "c745e7f8c8aa48d2831a0f07142213d4",
+      "send_audio": false,
+      "transcript_format": "json"
+    }
+  },
+  "webhooks": [
+    {
+      "auth_type": "hmac",
+      "events": null,
+      "is_disabled": false,
+      "name": "Ngrok local endpoint",
+      "retry_enabled": false,
+      "webhook_id": "c745e7f8c8aa48d2831a0f07142213d4",
+      "webhook_url": "https://cataract-party-survive.ngrok-free.dev/webhooks/elevenlabs"
+    }
+  ]
+}

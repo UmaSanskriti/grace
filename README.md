@@ -136,7 +136,7 @@ Agent configuration is version-controlled across two files per agent:
 | `agents/{type}.json` | the full `conversation_config` — llm, voice, temperature, asr, turn, ... (everything *except* the prompt text + first message) |
 
 The script targets the ElevenLabs agents named by the `ELEVENLABS_*_AGENT_ID` values in `.env`
-(`type` = `intake` | `quote` | `nego`).
+(`type` = `intake` | `quote` | `nego` | `report`).
 
 ```bash
 # 1. bootstrap (or re-sync) agents/*.json from your live agents — run this first
@@ -156,9 +156,27 @@ so git is the source of truth — a value changed in the dashboard is reverted o
 unless you `--pull` it first. `{{dynamic_variables}}` used in the prose are auto-registered as
 placeholders (default `""`); set non-empty defaults directly in `agents/{type}.json`.
 
-Not managed by this script (still done in the dashboard): attaching phone numbers, the
-workspace-level post-call webhook URL/secret, and `platform_settings` (widget, data collection,
-evaluation criteria).
+### Mirrored but never pushed
+
+Two things are tracked so drift shows up in a diff, but are only ever changed in the dashboard:
+
+| File | Owns |
+|---|---|
+| `agents/report.json` + `prompts/report_agent.md` | the `report` agent — mirror-only (`PULL_ONLY` in the script), so `deploy` reports drift and skips it |
+| `agents/workspace.json` | workspace-level config: `/v1/convai/settings` and the workspace webhooks (id, name, URL, auth type). No secret values are returned by the API, so this is safe to commit |
+
+`--dry-run` also checks the live post-call webhook against `BASE_URL` and warns when they diverge —
+the failure mode every ngrok restart causes, where calls still connect and transcripts silently
+never arrive:
+
+```bash
+uv run python scripts/deploy_agents.py --dry-run --agent workspace
+#   [workspace] ✔ post-call webhook matches BASE_URL -> https://….ngrok-free.dev/webhooks/elevenlabs
+```
+
+Still not managed at all (dashboard only): attaching phone numbers, the webhook HMAC secret,
+`platform_settings` (widget, data collection, evaluation criteria), and the workspace tool
+definitions.
 
 ## Endpoints
 
