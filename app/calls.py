@@ -33,6 +33,35 @@ def _home_by_id(homes: list[dict], fh_id: str) -> dict | None:
     return next((h for h in homes if h.get("id") == fh_id), None)
 
 
+def _usable_quotes(case_id: str) -> list[dict]:
+    """Quote records that can actually carry the case forward.
+
+    A record counts only if the home was reached AND gave a number. An
+    `unreachable` marker, or a home that answered but refused to quote, gives
+    the strategy LLM no price to target and the negotiation agent nothing to
+    cite — proceeding on those is exactly the "strategy over nothing" walk in
+    issue #16.
+
+    Never raises: a corrupt or unreadable quote file is not usable, and that is
+    all this needs to decide.
+    """
+    out: list[dict] = []
+    qdir = storage.case_dir(case_id) / "quotes"
+    if not qdir.exists():
+        return out
+    for path in sorted(qdir.glob("*.json")):
+        try:
+            q = storage.read_json(case_id, f"quotes/{path.name}") or {}
+        except Exception as e:
+            log.warning("unreadable quote file case=%s %s: %s", case_id, path.name, e)
+            continue
+        if not isinstance(q, dict):
+            continue
+        if q.get("reached") and q.get("quoted_price_usd") is not None:
+            out.append(q)
+    return out
+
+
 def _mark_unreachable(
     case_id: str, home: dict, reason: str, call_id: str | None = None
 ) -> None:
@@ -126,9 +155,27 @@ def start_next_quote_call(case_id: str) -> dict:
         )
         return {"placed": fh_id, "conversation_id": conv}
 
-    # Nothing left to call.
+    # Nothing left to call. Before advancing, check the round actually yielded
+    # something. If not one home was reached with a price there is nothing to
+    # build a strategy from and nothing to negotiate over, so stop here rather
+    # than walking the case into strategy on empty data (issue #16). Terminal:
+    # `quotes_failed` is not a status start_next_quote_call re-enters on, so a
+    # webhook retry cannot bounce the case back out of it.
+    usable = _usable_quotes(case_id)
+    if not usable:
+        attempted = len(list((storage.case_dir(case_id) / "quotes").glob("*.json"))) \
+            if (storage.case_dir(case_id) / "quotes").exists() else 0
+        storage.set_status(case_id, "quotes_failed")
+        log.error(
+            "no usable quote from any funeral home case=%s (%d attempted) "
+            "-> quotes_failed; not advancing to strategy",
+            case_id, attempted,
+        )
+        return {"done": True, "status": "quotes_failed", "usable_quotes": 0,
+                "attempted": attempted}
+
     storage.set_status(case_id, "quotes_collected")
-    log.info("all quotes collected case=%s", case_id)
+    log.info("all quotes collected case=%s (%d usable)", case_id, len(usable))
     # Re-check: the abort may have landed while the last quote call was in
     # flight, and set_status above would have cleared a status-based flag.
     if storage.is_aborted(case_id):
@@ -142,12 +189,24 @@ def start_next_quote_call(case_id: str) -> dict:
     return {"done": True, "status": (storage.read_case(case_id) or {}).get("status")}
 
 
-def handle_quote_result(case_id: str, fh_id: str | None, conversation_id: str, transcript: str) -> None:
+def handle_quote_result(
+    case_id: str,
+    fh_id: str | None,
+    conversation_id: str,
+    transcript: str,
+    failure_reason: str | None = None,
+) -> None:
     """Extract + save a quote from a finished call, then place the next one.
 
     Idempotent: re-skips extraction if the quote is already recorded (webhook
     retries). Extraction/empty-transcript failures mark the home unreachable so
     the loop always advances.
+
+    `failure_reason` is set when the post-call webhook said the conversation
+    failed or was cut off (see webhook.ParsedWebhook.failure_reason). Such a
+    transcript is never handed to extraction — a truncated call can still carry
+    a plausible-looking number, and extracting one would record a quote that was
+    never actually given.
     """
     if not fh_id:
         log.warning("quote webhook without fh_id case=%s — cannot record", case_id)
@@ -158,7 +217,13 @@ def handle_quote_result(case_id: str, fh_id: str | None, conversation_id: str, t
     else:
         homes = storage.read_json(case_id, "funeral_homes.json") or []
         home = _home_by_id(homes, fh_id) or {"id": fh_id, "name": ""}
-        if not transcript.strip():
+        if failure_reason:
+            # The call was really placed, so carry the conversation id: this
+            # counts as a dial attempt even though it yielded nothing.
+            _mark_unreachable(
+                case_id, home, f"call failed: {failure_reason}", call_id=conversation_id
+            )
+        elif not transcript.strip():
             # The call was actually placed (a conversation_id exists) — just
             # nobody picked up, or the transcript came back empty. Distinct
             # from "never dialed": carry the call id so _homes_called counts
@@ -198,14 +263,22 @@ def _nego_rel(fh_id: str) -> str:
     return f"negotiations/{fh_id}.json"
 
 
-def _mark_nego_unreachable(case_id: str, fh_id: str, name: str, reason: str) -> None:
+def _mark_nego_unreachable(
+    case_id: str, fh_id: str, name: str, reason: str, call_id: str | None = None
+) -> None:
+    """Record a negotiation as not achieved.
+
+    `call_id` mirrors `_mark_unreachable`: pass the conversation id when the
+    call was actually placed (no answer, a failed/truncated conversation, or an
+    extraction failure) and leave it None when the home was never dialed.
+    """
     storage.save_json(
         case_id,
         _nego_rel(fh_id),
         {
             "funeral_home_id": fh_id,
             "funeral_home_name": name,
-            "call_id": None,
+            "call_id": call_id,
             "agreed": False,
             "final_price_usd": None,
             "status": "unreachable",
@@ -373,8 +446,19 @@ def start_next_nego_call(case_id: str) -> dict:
     return {"done": True, "status": "done", "report_call": rc}
 
 
-def handle_nego_result(case_id: str, fh_id: str | None, conversation_id: str, transcript: str) -> None:
-    """Extract + save a negotiation outcome, then place the next one (or report)."""
+def handle_nego_result(
+    case_id: str,
+    fh_id: str | None,
+    conversation_id: str,
+    transcript: str,
+    failure_reason: str | None = None,
+) -> None:
+    """Extract + save a negotiation outcome, then place the next one (or report).
+
+    `failure_reason` is set when the post-call webhook said the conversation
+    failed or was cut off; that transcript is never extracted, so a truncated
+    call can never be recorded as an agreed price (issue #16).
+    """
     if not fh_id:
         log.warning("nego webhook without fh_id case=%s — cannot record", case_id)
         return
@@ -386,13 +470,24 @@ def handle_nego_result(case_id: str, fh_id: str | None, conversation_id: str, tr
         home = _home_by_id(homes, fh_id) or {"id": fh_id, "name": ""}
         quote = storage.read_json(case_id, _quote_rel(fh_id)) or {}
         name = home.get("name") or quote.get("funeral_home_name", "")
-        if not transcript.strip():
-            _mark_nego_unreachable(case_id, fh_id, name, "empty transcript / no answer")
+        if failure_reason:
+            _mark_nego_unreachable(
+                case_id, fh_id, name, f"call failed: {failure_reason}",
+                call_id=conversation_id,
+            )
+        elif not transcript.strip():
+            _mark_nego_unreachable(
+                case_id, fh_id, name, "empty transcript / no answer",
+                call_id=conversation_id,
+            )
         else:
             try:
                 outcome = extract_final_price(transcript)
             except Exception as e:
-                _mark_nego_unreachable(case_id, fh_id, name, f"extraction failed: {e}")
+                _mark_nego_unreachable(
+                    case_id, fh_id, name, f"extraction failed: {e}",
+                    call_id=conversation_id,
+                )
             else:
                 record = {
                     "funeral_home_id": fh_id,

@@ -39,11 +39,16 @@ _PROGRESS: dict[str, int] = {
     "orphan_webhook": 0,
     "awaiting_intake": 3,
     "active": 3,
+    "intake_call_failed": 3,
     "intake_extract_failed": 3,
     "intake_done": 5,
     "researching": 6,
     "research_failed": 6,
     "calling_for_quotes": 7,
+    # Terminal: the quote round finished but produced nothing usable. Shares
+    # quotes_collected's slot so the caller node still lights up as reached —
+    # the case got this far, it just cannot continue past it.
+    "quotes_failed": 9,
     "quotes_collected": 9,
     "strategy_ready": 10,
     "negotiating": 11,
