@@ -56,7 +56,12 @@ interface LaunchedCall { label: string; conversation_id: string; provider_id?: s
 // Polls /call-transcript for one conversation and renders the turns once the
 // call is done (or in progress). All calls are real; transcript shown for the
 // consented demo (INV-07). React escapes text on render — no injection.
-function CallTranscript({ call }: { call: LaunchedCall }) {
+function CallTranscript({ call, onTurns }: {
+  call: LaunchedCall;
+  // Reports turn count upward so the page can tell a call that is merely
+  // logged from one that is actually being transcribed.
+  onTurns?: (conversationId: string, turns: number) => void;
+}) {
   const [status, setStatus] = useState("pending");
   const [turns, setTurns] = useState<{ role: string; message: string }[]>([]);
   const [dur, setDur] = useState<number | null>(null);
@@ -70,12 +75,13 @@ function CallTranscript({ call }: { call: LaunchedCall }) {
         );
         if (!alive) return;
         setStatus(r.status); setTurns(r.transcript); setDur(r.duration_secs);
+        onTurns?.(call.conversation_id, r.transcript?.length ?? 0);
       } catch { /* keep polling */ }
     };
     tick();
     const t = setInterval(tick, 3000);
     return () => { alive = false; clearInterval(t); };
-  }, [call.conversation_id]);
+  }, [call.conversation_id, onTurns]);
 
   const done = status === "done" || status === "failed";
   const live = status === "in-progress" || status === "processing";
@@ -320,6 +326,15 @@ export default function AgentLoop() {
   const [err, setErr] = useState<string>("");
   const [aborting, setAborting] = useState(false);
 
+  // Conversations that have produced at least one turn. A call row can exist
+  // before ElevenLabs has any transcript for it, so "a call is logged" is not
+  // the same as "we are hearing it" — only the latter retires the waiting
+  // banner. Ids stay in the set so the banner cannot flicker back mid-call.
+  const [transcribing, setTranscribing] = useState<string[]>([]);
+  const noteTurns = useCallback((conversationId: string, turns: number) => {
+    setTranscribing((p) => (turns > 0 && !p.includes(conversationId) ? [...p, conversationId] : p));
+  }, []);
+
   // Case ids we have already seen, so a genuinely new one can be told apart
   // from the list simply reloading. Seeded on the first poll.
   const seenCases = useRef<Set<string> | null>(null);
@@ -351,6 +366,9 @@ export default function AgentLoop() {
     const t = setInterval(tick, 3000);
     return () => { alive = false; clearInterval(t); };
   }, []);
+
+  // A different case starts from "waiting" again.
+  useEffect(() => { setTranscribing([]); }, [caseId]);
 
   // Poll the selected case live.
   const poll = useCallback(() => {
@@ -408,6 +426,18 @@ export default function AgentLoop() {
   const activePipe = useMemo(() => {
     if (!view) return -1;
     return PIPELINE.findIndex((s) => s.derive(view).state === "active");
+  }, [view]);
+
+  // /agent-activity derives this feed oldest-first — current status, then
+  // quotes, then negotiations in the order they happened — and every entry
+  // carries the same case timestamp, so sorting by time is a no-op. Taking the
+  // first 8 therefore pinned the ticker to the START of the run and hid the
+  // negotiations entirely. Newest first, with the status line kept on top
+  // because it describes the case right now rather than a past step.
+  const recentEvents = useMemo(() => {
+    const all = view?.events ?? [];
+    const isStatus = (e: Activity["events"][number]) => e.type.startsWith("status:");
+    return [...all.filter(isStatus), ...all.filter((e) => !isStatus(e)).reverse()].slice(0, 8);
   }, [view]);
 
   return (
@@ -482,13 +512,15 @@ export default function AgentLoop() {
 
       {/* The consumer dials Grace; the loop starts itself. Outbound "run it
           live" controls were removed — nothing here places a call. */}
-      <div className="flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50/50 px-4 py-3">
-        <PhoneCall className="h-4 w-4 shrink-0 text-teal-700" />
-        <span className="text-sm font-semibold text-teal-900">Waiting for the family to call Grace</span>
-        <span className="text-[11px] text-teal-800">
-          The case appears here once the intake call ends, then the loop runs itself.
-        </span>
-      </div>
+      {transcribing.length === 0 && (
+        <div className="flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50/50 px-4 py-3">
+          <PhoneCall className="h-4 w-4 shrink-0 text-teal-700" />
+          <span className="text-sm font-semibold text-teal-900">Waiting for the family to call Grace</span>
+          <span className="text-[11px] text-teal-800">
+            The case appears here once the intake call ends, then the loop runs itself.
+          </span>
+        </div>
+      )}
 
       {err && !view && (
         <div className="rounded-lg border border-grace-dangerSoft bg-grace-dangerSoft p-3 text-sm text-grace-danger">
@@ -510,6 +542,22 @@ export default function AgentLoop() {
             </div>
           </div>
 
+          {/* Call transcripts — every call on this case, including the
+              consumer's own inbound intake. Driven by the case record rather
+              than by manual launches, so an inbound demo still shows them.
+              Sits directly under the pipeline: the conversation is what people
+              watch, and it should not need a scroll past the evidence layer. */}
+          {transcriptCalls.length > 0 && (
+            <div className="space-y-3">
+              <div className="text-sm font-bold" style={{ color: "#12213f" }}>Call transcripts</div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {transcriptCalls.map((c) => (
+                  <CallTranscript key={c.conversation_id} call={c} onTurns={noteTurns} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Shared layer */}
           <div className="rounded-2xl border border-dashed border-grace-border bg-grace-bg/60 p-4">
             <div className="mb-3 text-center text-xs font-bold uppercase tracking-wider text-grace-muted">
@@ -530,7 +578,7 @@ export default function AgentLoop() {
             <div className="rounded-xl border border-grace-border bg-white p-3 lg:w-1/2">
               <div className="mb-1 text-xs font-semibold text-grace-muted">Recent events</div>
               <div className="max-h-28 space-y-1 overflow-y-auto">
-                {view.events.length ? view.events.slice(0, 8).map((e, i) => (
+                {recentEvents.length ? recentEvents.map((e, i) => (
                   <div key={i} className="flex items-center justify-between text-[11px]">
                     <span className="font-mono text-grace-ink">{e.type}</span>
                     <span className="text-grace-muted">{e.actor}</span>
@@ -539,18 +587,6 @@ export default function AgentLoop() {
               </div>
             </div>
           </div>
-
-          {/* Call transcripts — every call on this case, including the
-              consumer's own inbound intake. Driven by the case record rather
-              than by manual launches, so an inbound demo still shows them. */}
-          {transcriptCalls.length > 0 && (
-            <div className="space-y-3">
-              <div className="text-sm font-bold" style={{ color: "#12213f" }}>Call transcripts</div>
-              <div className="grid gap-3 lg:grid-cols-2">
-                {transcriptCalls.map((c) => <CallTranscript key={c.conversation_id} call={c} />)}
-              </div>
-            </div>
-          )}
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-4 text-[11px] text-grace-muted">
