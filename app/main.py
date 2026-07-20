@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import calls, research, storage, strategy, web_api
@@ -84,6 +85,43 @@ def landing() -> Response:
     except OSError as e:
         log.error("landing page unreadable: %s", e)
         raise HTTPException(404, "landing page not installed")
+
+
+# --- admin dashboard (React SPA) -------------------------------------------
+# Built bundle, served under /admin because "/" is the consumer landing page.
+# `dist/` is gitignored, so it is built and shipped separately (see
+# docs/deploy-remote.md); when it is absent these routes 404 and nothing else
+# is affected.
+#
+# Mounted at /admin/assets rather than /admin so the SPA fallback below can own
+# every other path under /admin — a StaticFiles mount would answer them itself
+# and 404 client-side routes like /admin/agents on a hard refresh.
+
+WEB_DIST = Path(__file__).parent.parent / "web" / "dist"
+
+if (WEB_DIST / "assets").is_dir():
+    app.mount(
+        "/admin/assets",
+        StaticFiles(directory=WEB_DIST / "assets"),
+        name="admin-assets",
+    )
+
+
+@app.get("/admin", include_in_schema=False)
+@app.get("/admin/{spa_path:path}", include_in_schema=False)
+def admin_dashboard(spa_path: str = "") -> Response:
+    """Serve the dashboard shell for any /admin route.
+
+    react-router owns routing once loaded, but a hard refresh on /admin/agents
+    hits the server directly — so every path under /admin returns index.html
+    and lets the client router sort it out.
+    """
+    index = WEB_DIST / "index.html"
+    if not index.is_file():
+        raise HTTPException(
+            404, "dashboard not built (run `npm run build` in web/ and deploy web/dist)"
+        )
+    return Response(index.read_text(encoding="utf-8"), media_type="text/html")
 
 
 @app.get("/health")

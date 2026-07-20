@@ -117,7 +117,43 @@ setsid nohup .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 \
 curl -s localhost:8000/health   # base_url should now be the ngrok URL
 ```
 
-## 6. Verify from outside
+## 6. Ship the admin dashboard (optional)
+
+The React dashboard is served at `/admin`. `web/dist` is gitignored and there is
+no Node on the box, so build locally and copy the bundle up.
+
+**Build on your machine**, with `VITE_APP_BASE_URL` explicitly blank:
+
+```bash
+cd web
+npm ci                          # first time only
+VITE_APP_BASE_URL= npm run build
+```
+
+Clearing that variable matters. `web/.env` sets it to `http://localhost:8000` for
+the Vite dev server, and vite bakes the value in at build time — build without
+clearing it and the deployed bundle calls *the visitor's own machine*, failing
+as `Failed to fetch`. Blank means the bundle uses the origin it was served
+from, which is correct whenever one backend serves both the bundle and the API,
+and needs no rebuild when the public URL changes.
+
+Sanity-check before shipping:
+
+```bash
+grep -c 'localhost:8000' dist/assets/*.js   # must be 0
+```
+
+**Copy it up:**
+
+```bash
+ssh root@provider.boogle.cloud -p 30213 -i ~/.ssh/id_ed25519 'mkdir -p /opt/grace/web/dist'
+scp -r -P 30213 -i ~/.ssh/id_ed25519 web/dist/ root@provider.boogle.cloud:/opt/grace/web/
+```
+
+Restart the app (step 4) and `/admin` serves it. If `web/dist` is absent the
+route just 404s — nothing else is affected.
+
+## 7. Verify from outside
 
 From your own machine, not the box — the point is to prove the tunnel works:
 
@@ -125,6 +161,11 @@ From your own machine, not the box — the point is to prove the tunnel works:
 U=https://<your-ngrok-host>
 curl -s -H 'ngrok-skip-browser-warning: 1' $U/health
 curl -s -H 'ngrok-skip-browser-warning: 1' $U/ | grep -o 'href="tel:[^"]*"'
+
+# dashboard, if shipped — /admin and a client-side route must both be 200
+for p in /admin /admin/agents; do
+  curl -s -H 'ngrok-skip-browser-warning: 1' -o /dev/null -w "$p -> %{http_code}\n" $U$p
+done
 ```
 
 The `tel:` link should show the number from `.env`. If it's missing, `GRACE_PHONE_NUMBER` didn't
@@ -171,12 +212,16 @@ The tunnel exposes the whole API, not just the landing page:
 |---|---|
 | `GET /` | landing page — intended |
 | `GET /docs` | **interactive Swagger UI**, lets any visitor drive the API from a browser |
+| `GET /admin/*` | **admin dashboard** — browsable case list and full call transcripts |
+| `GET /call-transcript` | no auth — proxies complete transcripts of families' calls |
 | `POST /debug/call` | **no auth** — places real, billable ElevenLabs calls |
 | `POST /webhooks/elevenlabs` | HMAC-verified when `ELEVENLABS_WEBHOOK_SECRET` is set |
 | `GET /cases/{id}`, `POST /cases/{id}/advance` | no auth |
 
-Fine for a short demo on an unguessable hostname. Before leaving it up any longer, at minimum pass
-`docs_url=None` to `FastAPI()` and put a shared-secret check in front of `/debug/call`.
+Fine for a short demo on an unguessable hostname holding synthetic data. Before leaving it up any
+longer, at minimum pass `docs_url=None` to `FastAPI()`, put a shared-secret check in front of
+`/debug/call`, and put HTTP Basic auth in front of `/admin` and `/call-transcript` — those two
+surface real families' call transcripts to anyone with the link.
 
 ## Redeploying a new commit
 
@@ -191,6 +236,9 @@ setsid nohup .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 \
 ```
 
 The tunnel survives an app restart — leave ngrok alone unless the URL needs to change.
+
+If the change touched `web/`, rebuild and re-ship the bundle too (step 6) — `git pull` does not
+bring it, since `web/dist` is gitignored.
 
 ## Checking on it
 
