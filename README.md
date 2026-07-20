@@ -156,6 +156,15 @@ so git is the source of truth — a value changed in the dashboard is reverted o
 unless you `--pull` it first. `{{dynamic_variables}}` used in the prose are auto-registered as
 placeholders (default `""`); set non-empty defaults directly in `agents/{type}.json`.
 
+### git holds production prompts; live is deliberately shorter
+
+The prompts in this repo are the realistic, production-length versions. The agents currently live
+in ElevenLabs run intentionally **shortened** scripts so demo calls stay brief. That divergence is
+on purpose, so `--dry-run` reporting drift on `quote`/`nego` is the expected state, not a problem
+to fix — **do not run a plain `deploy` to "sync" it** unless you actually mean to lengthen the live
+demo calls, and do not `--pull` the prose back, which would overwrite the production prompt with
+the demo script.
+
 ### Mirrored but never pushed
 
 Two things are tracked so drift shows up in a diff, but are only ever changed in the dashboard:

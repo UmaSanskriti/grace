@@ -90,17 +90,70 @@ def _mark_unreachable(
     log.info("quote home unreachable case=%s fh=%s: %s", case_id, fh_id, reason)
 
 
+# service_preferences keys worth reading to a provider, in the order the quote
+# agent walks them. Everything else intake captures is internal.
+_QUOTE_NOTE_LABELS: tuple[tuple[str, str], ...] = (
+    ("viewing", "viewing"),
+    ("ceremony", "ceremony"),
+    ("ceremony_location", "ceremony location"),
+    ("embalming", "embalming"),
+    ("casket_source", "casket from"),
+    ("urn_source", "urn from"),
+    ("ashes_return", "ashes returned by"),
+    ("religion_tradition", "tradition"),
+    ("language_needs", "language"),
+    ("service_date_window", "service window"),
+)
+
+_UNSET = (None, "", "unknown")
+
+
+def _humanize(value: str) -> str:
+    return str(value).replace("_", " ")
+
+
+def _service_notes(prefs: dict) -> str:
+    """Confirmed intake preferences, as one sentence the agent can read aloud.
+
+    Entries intake never resolved are dropped rather than passed through: an
+    agent that reads "disposition detail: unknown" to a funeral director is
+    stating a placeholder as if it were a family decision.
+    """
+    parts: list[str] = []
+    for key, label in _QUOTE_NOTE_LABELS:
+        value = prefs.get(key)
+        if value in _UNSET:
+            continue
+        if isinstance(value, bool):
+            if value:
+                parts.append(label)
+            continue
+        parts.append(f"{label}: {_humanize(value)}")
+    return "; ".join(parts) or "nothing beyond the case details above"
+
+
 def _quote_dynamic_vars(case_id: str, home: dict, user_info: dict) -> dict[str, str]:
     loc = user_info.get("location") or {}
+    prefs = user_info.get("service_preferences") or {}
+    disposition = prefs.get("disposition_detail")
+    must_haves = user_info.get("must_haves") or []
     return {
         "case_id": case_id,
         "agent_type": "quote",
         "fh_id": home.get("id", ""),
+        "funeral_home_name": home.get("name") or "your funeral home",
         "service_type": user_info.get("service_type") or "",
         "city": loc.get("city") or "",
         "state": loc.get("state") or "",
         "timeline": user_info.get("timeline") or "",
         "attendee_count": str(user_info.get("attendee_estimate") or ""),
+        # Empty is meaningful here, so say so rather than leave a blank the
+        # agent has to improvise around (see _nego_dynamic_vars).
+        "disposition_detail": (
+            _humanize(disposition) if disposition not in _UNSET else "to be confirmed by the family"
+        ),
+        "must_haves": ", ".join(must_haves) or "everything discussed at intake",
+        "service_notes": _service_notes(prefs),
     }
 
 
